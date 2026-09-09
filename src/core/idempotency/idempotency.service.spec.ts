@@ -1,4 +1,4 @@
-import { ConflictException } from "@core/errors/app.exception";
+import { ConflictException } from "../errors/app.exception";
 import { IdempotencyService } from "./idempotency.service";
 import { InMemoryIdempotencyStorage } from "./storage/in-memory-idempotency.storage";
 

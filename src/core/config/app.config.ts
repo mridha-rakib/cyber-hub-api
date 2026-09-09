@@ -18,4 +18,5 @@ export const appConfig = {
   },
   logLevel: envConfig.LOG_LEVEL,
   requestBodyLimit: envConfig.REQUEST_BODY_LIMIT,
+  enableSwagger: envConfig.ENABLE_SWAGGER,
 } as const;

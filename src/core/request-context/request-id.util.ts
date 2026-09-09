@@ -1,9 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 export function createRequestId(existingRequestId?: string | string[]) {
-  if (Array.isArray(existingRequestId)) {
-    return existingRequestId[0] ?? randomUUID();
-  }
-
-  return existingRequestId ?? randomUUID();
+  return typeof existingRequestId === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(existingRequestId)
+    ? existingRequestId
+    : randomUUID();
 }

@@ -1,4 +1,3 @@
-import { ErrorCodes } from "@core/errors/error.codes";
 import {
   type ArgumentMetadata,
   Injectable,
@@ -6,6 +5,7 @@ import {
   type PipeTransform,
 } from "@nestjs/common";
 import type { ZodType } from "zod";
+import { ErrorCodes } from "../errors/error.codes";
 
 @Injectable()
 export class ValidationPipe implements PipeTransform {

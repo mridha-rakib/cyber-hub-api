@@ -1,5 +1,6 @@
 import { CallHandler, ExecutionContext, Injectable, type NestInterceptor } from "@nestjs/common";
 import { map, type Observable } from "rxjs";
+import { RAW_RESPONSE } from "../../common/decorators/raw-response.decorator";
 import type { ApiResponse } from "./api.response";
 
 interface ResponsePayload<TData = unknown, TMeta = unknown> {
@@ -11,6 +12,9 @@ interface ResponsePayload<TData = unknown, TMeta = unknown> {
 @Injectable()
 export class ResponseInterceptor<TData> implements NestInterceptor<TData, ApiResponse<TData>> {
   intercept(_context: ExecutionContext, next: CallHandler): Observable<ApiResponse<TData>> {
+    if (Reflect.getMetadata(RAW_RESPONSE, _context.getHandler())) {
+      return next.handle() as Observable<ApiResponse<TData>>;
+    }
     return next.handle().pipe(
       map((payload: TData | ResponsePayload<TData>) => {
         const normalized = this.normalizePayload(payload);

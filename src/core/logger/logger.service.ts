@@ -1,68 +1,34 @@
-import { appConfig } from "@core/config/app.config";
-import { Injectable, type LoggerService as NestLoggerService } from "@nestjs/common";
-import pino, { type Logger } from "pino";
+import { Injectable } from "@nestjs/common";
+import { PinoLogger } from "nestjs-pino";
+import { RequestContextService } from "../request-context/request-context.service";
 
-const REDACTED_PATHS = [
-  "req.headers.authorization",
-  "req.headers.cookie",
-  "password",
-  "*.password",
-  "token",
-  "*.token",
-  "secret",
-  "*.secret",
-  "payment",
-  "*.payment",
-  "card",
-  "*.card",
-];
+export type LogCategory = "application" | "security" | "audit" | "billing";
+export interface LogFields extends Record<string, unknown> {
+  category?: LogCategory;
+}
 
 @Injectable()
-export class LoggerService implements NestLoggerService {
-  private readonly logger: Logger;
-
-  constructor() {
-    this.logger = pino({
-      level: appConfig.logLevel,
-      timestamp: pino.stdTimeFunctions.isoTime,
-      transport: appConfig.isProduction
-        ? undefined
-        : {
-            target: "pino-pretty",
-            options: {
-              colorize: true,
-              singleLine: true,
-              translateTime: "SYS:standard",
-            },
-          },
-      redact: {
-        paths: REDACTED_PATHS,
-        censor: "[REDACTED]",
-      },
-    });
+export class LoggerService {
+  constructor(
+    private readonly logger: PinoLogger,
+    private readonly context: RequestContextService,
+  ) {}
+  info(message: string, fields: LogFields = {}) {
+    this.logger.info(this.fields(fields), message);
   }
-
-  log(message: string, context?: unknown) {
-    this.logger.info({ context }, message);
+  log(message: string, fields: LogFields = {}) {
+    this.info(message, fields);
   }
-
-  warn(message: string, context?: unknown) {
-    this.logger.warn({ context }, message);
+  warn(message: string, fields: LogFields = {}) {
+    this.logger.warn(this.fields(fields), message);
   }
-
-  error(message: string, trace?: string, context?: unknown) {
-    this.logger.error({ context, trace }, message);
+  error(message: string, fields: LogFields = {}) {
+    this.logger.error(this.fields(fields), message);
   }
-
-  debug(message: string, context?: unknown) {
-    this.logger.debug({ context }, message);
+  debug(message: string, fields: LogFields = {}) {
+    this.logger.debug(this.fields(fields), message);
   }
-
-  verbose(message: string, context?: unknown) {
-    this.logger.trace({ context }, message);
-  }
-
-  child(bindings: Record<string, unknown>): Logger {
-    return this.logger.child(bindings);
+  private fields(fields: LogFields) {
+    return { category: "application", ...fields, ...this.context.getContext() };
   }
 }

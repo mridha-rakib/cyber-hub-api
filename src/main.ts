@@ -5,7 +5,7 @@ import { appConfig } from "./core/config/app.config";
 import { LoggerService } from "./core/logger/logger.service";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create(AppModule, { bufferLogs: true, bodyParser: false });
   const logger = app.get(LoggerService);
 
   configureApplication(app);

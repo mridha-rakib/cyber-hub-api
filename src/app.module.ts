@@ -1,11 +1,16 @@
-import { MiddlewareConsumer, Module, type NestModule } from "@nestjs/common";
+import {
+  BadRequestException,
+  type MiddlewareConsumer,
+  Module,
+  type NestModule,
+} from "@nestjs/common";
 import { ThrottlerModule } from "@nestjs/throttler";
-import { AppController } from "./app.controller";
+import { json, type NextFunction, type Request, type Response, urlencoded } from "express";
 import { appConfig } from "./core/config/app.config";
 import { DatabaseModule } from "./core/database/database.module";
+import { HealthModule } from "./core/health/health.module";
 import { IdempotencyModule } from "./core/idempotency/idempotency.module";
 import { LoggerModule } from "./core/logger/logger.module";
-import { RequestContextMiddleware } from "./core/request-context/request-context.middleware";
 import { RequestContextModule } from "./core/request-context/request-context.module";
 import { SecurityModule } from "./core/security/security.module";
 
@@ -16,6 +21,7 @@ import { SecurityModule } from "./core/security/security.module";
     DatabaseModule,
     SecurityModule,
     IdempotencyModule,
+    HealthModule,
     ThrottlerModule.forRoot([
       {
         ttl: appConfig.rateLimit.ttlSeconds,
@@ -23,10 +29,21 @@ import { SecurityModule } from "./core/security/security.module";
       },
     ]),
   ],
-  controllers: [AppController],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(RequestContextMiddleware).forRoutes("*");
+    const parseJson = json({ limit: appConfig.requestBodyLimit });
+    // Imported logger middleware must run before parsing can reject a request.
+    consumer
+      .apply(
+        (req: Request, res: Response, next: NextFunction) => {
+          parseJson(req, res, (error?: unknown) => {
+            // SyntaxError messages can include excerpts from confidential bodies.
+            next(error instanceof SyntaxError ? new BadRequestException("Malformed JSON") : error);
+          });
+        },
+        urlencoded({ extended: true, limit: appConfig.requestBodyLimit }),
+      )
+      .forRoutes("{/*path}");
   }
 }

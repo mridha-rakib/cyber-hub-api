@@ -1,5 +1,5 @@
-import type { FindManyOptions, IRepository } from "@common/interfaces/repository.interface";
-import { TransactionManager } from "@core/database/transaction.manager";
+import type { FindManyOptions, IRepository } from "../../../common/interfaces/repository.interface";
+import { TransactionManager } from "../../../core/database/transaction.manager";
 
 export abstract class BaseRepository<
   TEntity,

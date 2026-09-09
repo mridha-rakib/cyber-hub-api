@@ -1,4 +1,3 @@
-import type { LoggerService } from "@core/logger/logger.service";
 import {
   type ArgumentsHost,
   Catch,
@@ -7,6 +6,7 @@ import {
   type ExceptionFilter as NestExceptionFilter,
 } from "@nestjs/common";
 import type { Request, Response } from "express";
+import type { LoggerService } from "../logger/logger.service";
 import { AppException } from "./app.exception";
 import { ErrorCodes } from "./error.codes";
 
@@ -21,26 +21,27 @@ export class ExceptionFilter implements NestExceptionFilter {
     const requestId = request.requestId ?? response.getHeader("x-request-id")?.toString() ?? "";
     const errorResponse = this.normalizeException(exception);
 
-    this.logger.error(
-      errorResponse.message,
-      exception instanceof Error ? exception.stack : undefined,
-      {
-        code: errorResponse.code,
-        method: request.method,
-        path: request.url,
-        requestId,
-        statusCode: errorResponse.statusCode,
-      },
-    );
+    const fields = {
+      err: exception instanceof Error ? exception : undefined,
+      code: errorResponse.code,
+      method: request.method,
+      path: request.path,
+      requestId,
+      statusCode: errorResponse.statusCode,
+    };
+    if (errorResponse.statusCode >= 500) this.logger.error("HTTP exception", fields);
+    else this.logger.warn("HTTP exception", fields);
 
     response.status(errorResponse.statusCode).json({
       success: false,
       code: errorResponse.code,
-      message: errorResponse.message,
+      message: errorResponse.statusCode >= 500 ? "Internal server error" : errorResponse.message,
       requestId,
       timestamp: new Date().toISOString(),
-      path: request.url,
-      ...(errorResponse.metadata ? { metadata: errorResponse.metadata } : {}),
+      path: request.path,
+      ...(errorResponse.statusCode < 500 && errorResponse.metadata
+        ? { metadata: errorResponse.metadata }
+        : {}),
     });
   }
 

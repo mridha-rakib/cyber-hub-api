@@ -1,6 +1,6 @@
-import { ErrorCodes } from "@core/errors/error.codes";
 import { BadRequestException } from "@nestjs/common";
 import { z } from "zod";
+import { ErrorCodes } from "../errors/error.codes";
 import { ValidationPipe } from "./validation.pipe";
 
 describe("ValidationPipe", () => {

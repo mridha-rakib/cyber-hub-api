@@ -10,8 +10,14 @@ const envSchema = z.object({
   CORS_ORIGINS: z.string().default("http://localhost:3000"),
   RATE_LIMIT_TTL_SECONDS: z.coerce.number().int().positive().default(60),
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(100),
-  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
+  LOG_LEVEL: z
+    .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
+    .default(process.env.NODE_ENV === "development" || !process.env.NODE_ENV ? "debug" : "info"),
   REQUEST_BODY_LIMIT: z.string().min(1).default("1mb"),
+  ENABLE_SWAGGER: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

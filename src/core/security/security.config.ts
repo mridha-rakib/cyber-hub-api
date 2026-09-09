@@ -1,5 +1,5 @@
-import { appConfig } from "@core/config/app.config";
 import type { INestApplication } from "@nestjs/common";
+import { appConfig } from "../config/app.config";
 
 export function configureSecurity(app: INestApplication) {
   app.enableCors({

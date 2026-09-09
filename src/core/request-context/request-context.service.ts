@@ -17,4 +17,10 @@ export class RequestContextService {
   getRequestId(): string | undefined {
     return this.getContext()?.requestId;
   }
+
+  setIdentity(identity: Pick<RequestContext, "userId" | "companyId" | "tenantId">): void {
+    const context = this.storage.getStore();
+    if (!context) throw new Error("No active request context");
+    Object.assign(context, identity);
+  }
 }
