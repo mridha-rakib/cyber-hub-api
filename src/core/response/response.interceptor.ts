@@ -1,0 +1,44 @@
+import { CallHandler, ExecutionContext, Injectable, type NestInterceptor } from "@nestjs/common";
+import { map, type Observable } from "rxjs";
+import type { ApiResponse } from "./api.response";
+
+interface ResponsePayload<TData = unknown, TMeta = unknown> {
+  message?: string;
+  data?: TData;
+  meta?: TMeta;
+}
+
+@Injectable()
+export class ResponseInterceptor<TData> implements NestInterceptor<TData, ApiResponse<TData>> {
+  intercept(_context: ExecutionContext, next: CallHandler): Observable<ApiResponse<TData>> {
+    return next.handle().pipe(
+      map((payload: TData | ResponsePayload<TData>) => {
+        const normalized = this.normalizePayload(payload);
+
+        return {
+          success: true,
+          message: normalized.message,
+          data: normalized.data,
+          ...(normalized.meta ? { meta: normalized.meta } : {}),
+        };
+      }),
+    );
+  }
+
+  private normalizePayload(payload: TData | ResponsePayload<TData>) {
+    if (payload && typeof payload === "object" && ("data" in payload || "message" in payload)) {
+      const responsePayload = payload as ResponsePayload<TData>;
+
+      return {
+        message: responsePayload.message ?? "Success",
+        data: responsePayload.data as TData,
+        meta: responsePayload.meta,
+      };
+    }
+
+    return {
+      message: "Success",
+      data: payload as TData,
+    };
+  }
+}
