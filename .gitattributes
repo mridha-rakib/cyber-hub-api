@@ -1,0 +1,29 @@
+# Ensure deterministic line endings across Windows/Linux/macOS checkouts.
+# Git decides text vs binary per-file and normalizes line endings to LF
+# both in the repository and on checkout, so local editors, CI runners,
+# and Biome's `lineEnding: "lf"` expectation never disagree.
+* text=auto eol=lf
+
+# Explicit text sources (redundant with the rule above, but explicit for
+# tooling/readers that inspect .gitattributes directly).
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.cjs text eol=lf
+*.mjs text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+
+# Binary assets — never run through text/EOL normalization.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.svg binary

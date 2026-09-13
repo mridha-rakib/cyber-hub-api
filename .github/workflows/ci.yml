@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Lint, Typecheck, Test, Build
+    runs-on: ubuntu-latest
+    env:
+      # Test-only, non-production values. The database URL is never dialed:
+      # DatabaseService is override-mocked in the e2e suite, and other tests
+      # never open a real PostgreSQL connection. Nothing here is a secret.
+      NODE_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/cyber_hub_test
+      CORS_ORIGINS: http://localhost:3000
+      ENABLE_SWAGGER: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (locked)
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test -- --runInBand
+
+      - name: Build
+        run: npm run build

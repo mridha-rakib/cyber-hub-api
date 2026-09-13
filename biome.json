@@ -13,7 +13,8 @@
       "!**/dist",
       "!**/coverage",
       "!**/drizzle",
-      "!**/package-lock.json"
+      "!**/package-lock.json",
+      "!public/fonts"
     ]
   },
   "formatter": {
