@@ -15,6 +15,7 @@ import {
 } from "../authorization/api-authorization-map";
 import type { ActorContext, OperationContext } from "../authorization/authorization-context.types";
 import { API_OPERATION_METADATA } from "../authorization/authorize-operation.decorator";
+import { getOperationRolePolicy } from "../authorization/operation-role-policy";
 import { isPermissionKey, PERMISSION_REGISTRY } from "../authorization/permission-registry";
 import { PERMISSION_KEY_METADATA } from "../authorization/require-permission.decorator";
 import { getRolePolicy } from "../authorization/role-policy";
@@ -163,16 +164,25 @@ export class PermissionGuard implements CanActivate {
       throw new PermissionDeniedException();
     }
 
-    // Precedence (Wave 0D-3 Closure Pass):
-    //   1. @AuthorizeOperation's API_AUTHORIZATION_MAP entry, when present
-    //      — the 209-operation contract is authoritative and already
-    //      specific to this exact route (Wave 0D-2 closure's AUTH_SCOPE
-    //      operation-level granularity applies here too).
-    //   2. Otherwise, the CURRENT ROLE's own entry in ROLE_POLICIES — never
+    // Precedence (Wave 0D-4 Part A extends the Wave 0D-3 Closure Pass):
+    //   1. OPERATION_ROLE_POLICIES — the current role's operation-AND-role
+    //      -specific override, when this exact (apiId, role) pair has one.
+    //      This is strictly the most specific source: it exists only for
+    //      the operations where API Contract v1.1's own bracket notation
+    //      ("[ASG / Admin]" etc.) expresses a real per-role ALTERNATIVE
+    //      that the flat operationEntry fields below cannot represent
+    //      (they hold one combined value for every role listed on the
+    //      operation).
+    //   2. Otherwise, @AuthorizeOperation's flat API_AUTHORIZATION_MAP
+    //      entry, when present — correct for every operation where all
+    //      listed roles genuinely share the same requirement.
+    //   3. Otherwise, the CURRENT ROLE's own entry in ROLE_POLICIES — never
     //      a role-blind union of every granted role's requirements. A role
     //      that passed the coarser `allowedRoles` check above but has no
     //      entry here is denied: `allowedRoles` only proves the role has
     //      *some* grant on this key, not what scope it must satisfy.
+    // Scopes from different roles/sources are never merged — exactly one
+    // of these three branches supplies the effective policy for a request.
     let scope: OperationContext["scope"];
     let resourceContextRequired: boolean;
     let assignmentRequired: boolean;
@@ -180,7 +190,20 @@ export class PermissionGuard implements CanActivate {
     let conditionIds: readonly string[] | undefined;
     const authorizationMode = operationEntry?.authorizationMode ?? "DIRECT_PERMISSION";
 
-    if (operationEntry) {
+    const operationRolePolicy =
+      declaredApiId && isApiId(declaredApiId)
+        ? getOperationRolePolicy(declaredApiId, principal.role)
+        : undefined;
+
+    if (operationRolePolicy) {
+      scope = operationRolePolicy.scopes;
+      resourceContextRequired = operationRolePolicy.resourceContextRequired;
+      assignmentRequired = operationRolePolicy.assignmentRequired;
+      authScopeRequired = operationRolePolicy.authScopeRequired;
+      conditionIds =
+        operationRolePolicy.conditionIds ??
+        getRolePolicy(effectivePermissionKey, principal.role)?.conditionIds;
+    } else if (operationEntry) {
       scope = operationEntry.scope;
       resourceContextRequired = operationEntry.resourceContextRequired;
       assignmentRequired = operationEntry.assignmentRequired;

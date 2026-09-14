@@ -220,6 +220,18 @@ class TestScopeController {
     return { ok: true };
   }
 
+  // Wave 0D-4 Part A: API-REV-001's role-ALTERNATIVE policy override.
+  // API Contract v1.1: "Role-scoped review queue: Mentor ASG only; Admin
+  // permitted oversight." — Mentor needs ASG, Admin does not, even though
+  // both are listed on the same operation with permission key
+  // submission.review_assigned.
+  @AuthorizeOperation("API-REV-001")
+  @RequirePermission("submission.review_assigned")
+  @Get("operation-role-alternation/:id")
+  operationRoleAlternationRoute() {
+    return { ok: true };
+  }
+
   // CALLER_DOMAIN_PERMISSION safety: these must never become reachable.
   @AuthorizeOperation("API-FILE-001")
   @Get("file-upload")
@@ -669,6 +681,48 @@ describe("Wave 0D-3 resource scope authorization", () => {
       await request(app.getHttpServer())
         .get("/api/v1/test-scope/operation-level/own")
         .set("Cookie", stranger.sessionCookie)
+        .expect(403);
+    });
+  });
+
+  describe("Wave 0D-4 Part A — operation-level role alternation (API-REV-001)", () => {
+    it("Mentor is denied without assignment (ASG required for Mentor)", async () => {
+      const mentor = await registerAndLoginLearner("op-alt-mentor-deny");
+      await setRole(mentor.userId, "ROLE_MENTOR");
+      await request(app.getHttpServer())
+        .get("/api/v1/test-scope/operation-role-alternation/unassigned")
+        .set("Cookie", mentor.sessionCookie)
+        .expect(403);
+    });
+
+    it("Mentor is allowed once assigned", async () => {
+      const mentor = await registerAndLoginLearner("op-alt-mentor-allow");
+      await setRole(mentor.userId, "ROLE_MENTOR");
+      identities.mentorUserId = mentor.userId;
+      await request(app.getHttpServer())
+        .get("/api/v1/test-scope/operation-role-alternation/assigned")
+        .set("Cookie", mentor.sessionCookie)
+        .expect(200);
+    });
+
+    it("Admin is allowed without any assignment — Admin's documented operation policy never requires ASG here", async () => {
+      const admin = await registerAndLoginLearner("op-alt-admin-allow");
+      await setRole(admin.userId, "ROLE_ADMIN");
+      // "unassigned" resource — would deny a Mentor, but Admin's own
+      // OPERATION_ROLE_POLICIES entry for API-REV-001 has scopes: [],
+      // so this must be a role-only allow, never inheriting Mentor's ASG.
+      await request(app.getHttpServer())
+        .get("/api/v1/test-scope/operation-role-alternation/unassigned")
+        .set("Cookie", admin.sessionCookie)
+        .expect(200);
+    });
+
+    it("Admin's role-only allow is never granted to Mentor (roles never merged in either direction)", async () => {
+      const mentor = await registerAndLoginLearner("op-alt-no-merge");
+      await setRole(mentor.userId, "ROLE_MENTOR");
+      await request(app.getHttpServer())
+        .get("/api/v1/test-scope/operation-role-alternation/unassigned")
+        .set("Cookie", mentor.sessionCookie)
         .expect(403);
     });
   });
