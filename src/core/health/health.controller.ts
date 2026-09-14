@@ -5,6 +5,7 @@ import {
   ApiServiceUnavailableResponse,
   ApiTags,
 } from "@nestjs/swagger";
+import { Public } from "../../common/decorators/public.decorator";
 import { RawResponse } from "../../common/decorators/raw-response.decorator";
 import { HealthService } from "./health.service";
 import type { HealthResponse } from "./health.types";
@@ -14,6 +15,7 @@ import type { HealthResponse } from "./health.types";
 export class HealthController {
   constructor(private readonly health: HealthService) {}
 
+  @Public()
   @Get()
   @RawResponse()
   @ApiOperation({ summary: "Readiness health check" })

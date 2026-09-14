@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Post, Res, UseGuards } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import type { Response } from "express";
+import { AuthenticatedOnly } from "../../../common/decorators/authenticated-only.decorator";
 import { CurrentUser } from "../../../common/decorators/current-user.decorator";
 import { Public } from "../../../common/decorators/public.decorator";
 import { RawResponse } from "../../../common/decorators/raw-response.decorator";
@@ -14,7 +15,6 @@ import {
 } from "../../../core/security/cookie/cookie.constants";
 import { CsrfGuard } from "../../../core/security/csrf/csrf.guard";
 import { CsrfService } from "../../../core/security/csrf/csrf.service";
-import { AuthGuard } from "../../../core/security/guards/auth.guard";
 import { ValidationPipe } from "../../../core/validation/validation.pipe";
 import { emailActionRequestSchema } from "../dto/email-action-request.dto";
 import { loginSchema } from "../dto/login.dto";
@@ -118,14 +118,14 @@ export class AuthController {
     return this.sessionViewBuilder.build(user);
   }
 
-  @UseGuards(AuthGuard)
+  @AuthenticatedOnly()
   @Get("session")
   @HttpCode(200)
   async getCurrentSession(@CurrentUser() principal: AuthPrincipal) {
     return this.sessionViewBuilder.build(principal.user);
   }
 
-  @UseGuards(AuthGuard)
+  @AuthenticatedOnly()
   @RawResponse()
   @Delete("session")
   @HttpCode(204)

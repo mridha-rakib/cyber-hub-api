@@ -60,12 +60,14 @@ export class SessionService {
 
     void this.sessionsRepository.touchLastSeen(session.id);
 
+    const { passwordHash: _passwordHash, ...safeUser } = user;
+
     return {
       sessionId: session.id,
       userId: user.id,
       role: user.role,
       employerId: user.employerId ?? undefined,
-      user,
+      user: safeUser,
     };
   }
 

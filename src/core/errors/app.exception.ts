@@ -101,6 +101,24 @@ export class SessionExpiredException extends AppException {
   }
 }
 
+export class PermissionDeniedException extends AppException {
+  constructor(
+    message = "You do not have permission to perform this action",
+    metadata?: Record<string, unknown>,
+  ) {
+    super({ code: ErrorCodes.FORBIDDEN, statusCode: HttpStatus.FORBIDDEN, message, metadata });
+  }
+}
+
+export class AuthorizationMisconfiguredException extends AppException {
+  constructor(
+    message = "This route is not authorized for access",
+    metadata?: Record<string, unknown>,
+  ) {
+    super({ code: ErrorCodes.FORBIDDEN, statusCode: HttpStatus.FORBIDDEN, message, metadata });
+  }
+}
+
 export class CsrfInvalidException extends AppException {
   constructor(message = "Missing or invalid CSRF token", metadata?: Record<string, unknown>) {
     super({ code: ErrorCodes.CSRF_INVALID, statusCode: HttpStatus.FORBIDDEN, message, metadata });

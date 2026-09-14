@@ -1,12 +1,12 @@
 import { Injectable } from "@nestjs/common";
-import type { User } from "../../../infrastructure/database/schema";
 import { EmployersRepository } from "../repositories/employers.repository";
+import type { SafeUser } from "./session-authentication.types";
 
 @Injectable()
 export class SessionViewBuilder {
   constructor(private readonly employersRepository: EmployersRepository) {}
 
-  async build(user: User) {
+  async build(user: SafeUser) {
     const employer = user.employerId
       ? await this.employersRepository.findById(user.employerId)
       : null;

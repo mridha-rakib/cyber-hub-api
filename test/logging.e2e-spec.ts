@@ -10,6 +10,7 @@ import { PARAMS_PROVIDER_TOKEN } from "nestjs-pino";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { configureApplication } from "../src/bootstrap";
+import { Public } from "../src/common/decorators/public.decorator";
 import { createLoggerConfig } from "../src/core/logger/logger.config";
 import { LoggerService } from "../src/core/logger/logger.service";
 import { RequestContextService } from "../src/core/request-context/request-context.service";
@@ -45,6 +46,10 @@ class ProbeService {
   }
 }
 
+// This fixture predates Wave 0D-2's global default-on AuthGuard and tests
+// generic structured-logging behavior unrelated to authorization; @Public()
+// keeps it exercising the same unauthenticated request path as before.
+@Public()
 @Controller("logging-probe")
 class ProbeController {
   constructor(private readonly service: ProbeService) {}

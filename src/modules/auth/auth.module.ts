@@ -1,7 +1,6 @@
 import { Module } from "@nestjs/common";
 import { CsrfGuard } from "../../core/security/csrf/csrf.guard";
 import { CsrfService } from "../../core/security/csrf/csrf.service";
-import { AuthGuard } from "../../core/security/guards/auth.guard";
 import { PasswordHasherService } from "../../core/security/password/password-hasher.service";
 import { OpaqueSecretService } from "../../core/security/token/opaque-secret.service";
 import { AuthController } from "./controllers/auth.controller";
@@ -29,7 +28,6 @@ import { TokenLifecycleService } from "./services/token-lifecycle.service";
     OpaqueSecretService,
     CsrfService,
     CsrfGuard,
-    AuthGuard,
     TokenLifecycleService,
     RegistrationService,
     EmailVerificationService,
