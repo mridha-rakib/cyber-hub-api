@@ -1,5 +1,6 @@
 import { type CanActivate, type ExecutionContext, Injectable, Logger } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
+import type { Request } from "express";
 import { IS_AUTHENTICATED_ONLY_ROUTE } from "../../../common/decorators/authenticated-only.decorator";
 import { IS_PUBLIC_ROUTE } from "../../../common/decorators/public.decorator";
 import {
@@ -7,53 +8,62 @@ import {
   AuthorizationMisconfiguredException,
   PermissionDeniedException,
 } from "../../errors/app.exception";
+import {
+  API_AUTHORIZATION_BY_ID,
+  type ApiOperationAuthorization,
+  isApiId,
+} from "../authorization/api-authorization-map";
+import type { ActorContext, OperationContext } from "../authorization/authorization-context.types";
+import { API_OPERATION_METADATA } from "../authorization/authorize-operation.decorator";
 import { isPermissionKey, PERMISSION_REGISTRY } from "../authorization/permission-registry";
 import { PERMISSION_KEY_METADATA } from "../authorization/require-permission.decorator";
+import { getRolePolicy } from "../authorization/role-policy";
+import { ScopeEvaluationService } from "../authorization/scope-evaluation.service";
 import type { AuthenticatedRequest } from "./auth.guard";
 
 /**
- * Wave 0D-2 deny-by-default RBAC enforcement.
+ * Wave 0D-2 role-level RBAC enforcement, extended in Wave 0D-3 with real
+ * OWN/ORG/ASG/PUB/COND resource-scope evaluation.
  *
  * Runs after the global AuthGuard (see security.module.ts's APP_GUARD
  * order), so by the time this guard executes, a public route has already
  * short-circuited and a protected route already has `request.principal`
  * populated from a DB-backed session — never from client input.
  *
- * THIS GUARD DOES ROLE-LEVEL ENFORCEMENT ONLY. Resource-scope evaluation
- * (OWN/ORG/ASG/PUB/COND/AUTH_SCOPE) is intentionally NOT implemented here —
- * that is Wave 0D-3 (OWN/ORG/ASG/PUB/COND) and Wave 0D-4 (AUTH_SCOPE). A
- * permission key that RBAC v1.0 attaches any scope to can never be
- * role-only allowed by this guard: it fails closed until the corresponding
- * evaluator exists. This is the critical safety property of this Wave —
- * see PERMISSION_REGISTRY's `scope` field and the "scope-sensitive" branch
- * below. Do not weaken it to make a route "work" before Wave 0D-3/0D-4.
+ * AUTH_SCOPE evaluation is intentionally NOT implemented here — that is
+ * Wave 0D-4. Any operation whose required scope includes AUTH_SCOPE is
+ * still unconditionally denied by ScopeEvaluationService, regardless of
+ * whether OWN/ORG/ASG/PUB/COND would otherwise pass. Do not weaken this.
  */
 @Injectable()
 export class PermissionGuard implements CanActivate {
   private readonly logger = new Logger(PermissionGuard.name);
 
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly scopeEvaluation: ScopeEvaluationService,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     try {
-      return this.evaluate(context);
+      return await this.evaluate(context);
     } catch (error) {
       if (error instanceof AppException) throw error;
       // An unexpected internal failure (bad metadata shape, registry
-      // lookup throwing, etc.) must never fail open.
+      // lookup throwing, resolver misbehaving, etc.) must never fail open.
       this.logger.error("PermissionGuard internal failure — failing closed", error as Error);
       throw new AuthorizationMisconfiguredException();
     }
   }
 
-  private evaluate(context: ExecutionContext): boolean {
+  private async evaluate(context: ExecutionContext): Promise<boolean> {
     const handler = context.getHandler();
     const klass = context.getClass();
 
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_ROUTE, [handler, klass]);
     if (isPublic) return true;
 
-    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest & Request>();
     const principal = request.principal;
 
     // AuthGuard (running earlier in the APP_GUARD chain) is responsible for
@@ -71,36 +81,78 @@ export class PermissionGuard implements CanActivate {
       IS_AUTHENTICATED_ONLY_ROUTE,
       [handler, klass],
     );
-    const permissionKey = this.reflector.getAllAndOverride<string | undefined>(
+    const declaredPermissionKey = this.reflector.getAllAndOverride<string | undefined>(
       PERMISSION_KEY_METADATA,
       [handler, klass],
     );
+    const declaredApiId = this.reflector.getAllAndOverride<string | undefined>(
+      API_OPERATION_METADATA,
+      [handler, klass],
+    );
+
+    // Resolve the API_AUTHORIZATION_MAP entry, if this route declares one.
+    // An unknown id is a misconfiguration — never silently ignored.
+    let operationEntry: ApiOperationAuthorization | undefined;
+    if (declaredApiId !== undefined) {
+      if (!isApiId(declaredApiId)) {
+        this.logger.warn(`Denying request — unknown API operation id: ${declaredApiId}`);
+        throw new AuthorizationMisconfiguredException();
+      }
+      operationEntry = API_AUTHORIZATION_BY_ID.get(declaredApiId);
+      if (!operationEntry) {
+        throw new AuthorizationMisconfiguredException();
+      }
+
+      // CALLER_DOMAIN_PERMISSION operations (API-FILE-001/002) have no
+      // fixed permission key and no resolver infrastructure yet — they
+      // must never become reachable via role/session alone.
+      if (operationEntry.authorizationMode === "CALLER_DOMAIN_PERMISSION") {
+        this.logger.warn(
+          `Denying request — "${declaredApiId}" is CALLER_DOMAIN_PERMISSION and has no caller-domain resolver yet`,
+        );
+        throw new PermissionDeniedException();
+      }
+
+      if (
+        operationEntry.permissionKey &&
+        declaredPermissionKey &&
+        operationEntry.permissionKey !== declaredPermissionKey
+      ) {
+        this.logger.warn(
+          `Denying request — @AuthorizeOperation("${declaredApiId}") permission key "${operationEntry.permissionKey}" does not match @RequirePermission("${declaredPermissionKey}")`,
+        );
+        throw new AuthorizationMisconfiguredException();
+      }
+    }
+
+    const effectivePermissionKey =
+      operationEntry?.permissionKey ?? declaredPermissionKey ?? undefined;
 
     // Every non-public route must be explicitly classified. "No permission
     // metadata" must never silently degrade into "authenticated only" —
     // that would let a future endpoint ship under-protected by omission.
-    if (!isAuthenticatedOnly && !permissionKey) {
+    if (!isAuthenticatedOnly && !effectivePermissionKey) {
       this.logger.warn(
         `Denying request to unclassified route ${klass.name}.${String(handler.name)} — missing @Public()/@AuthenticatedOnly()/@RequirePermission()`,
       );
       throw new AuthorizationMisconfiguredException();
     }
 
-    if (isAuthenticatedOnly && !permissionKey) {
+    if (isAuthenticatedOnly && !effectivePermissionKey) {
       return true;
     }
 
-    if (!permissionKey || !isPermissionKey(permissionKey)) {
+    if (!effectivePermissionKey || !isPermissionKey(effectivePermissionKey)) {
       this.logger.warn(
-        `Denying request — unknown permission key metadata: ${String(permissionKey)}`,
+        `Denying request — unknown permission key metadata: ${String(effectivePermissionKey)}`,
       );
       throw new AuthorizationMisconfiguredException();
     }
 
-    const definition = PERMISSION_REGISTRY[permissionKey];
+    const definition = PERMISSION_REGISTRY[effectivePermissionKey];
     if (!definition || definition.systemOnly) {
       this.logger.warn(
-        `Denying request — permission key is unregistered or system-only: ${permissionKey}`,
+        `Denying request — permission key is unregistered or system-only: ${effectivePermissionKey}`,
       );
       throw new AuthorizationMisconfiguredException();
     }
@@ -111,15 +163,79 @@ export class PermissionGuard implements CanActivate {
       throw new PermissionDeniedException();
     }
 
-    if (definition.scope.length > 0) {
-      // Role grant alone is proven insufficient by RBAC v1.0/State & Workflow
-      // v1.0 for any OWN/ORG/ASG/PUB/COND/AUTH_SCOPE-tagged permission. The
-      // evaluators that resolve these scopes against the actual resource
-      // don't exist yet (Wave 0D-3/0D-4), so this must fail closed rather
-      // than convert "role has permission key" into "role may access every
-      // object covered by that permission".
+    // Precedence (Wave 0D-3 Closure Pass):
+    //   1. @AuthorizeOperation's API_AUTHORIZATION_MAP entry, when present
+    //      — the 209-operation contract is authoritative and already
+    //      specific to this exact route (Wave 0D-2 closure's AUTH_SCOPE
+    //      operation-level granularity applies here too).
+    //   2. Otherwise, the CURRENT ROLE's own entry in ROLE_POLICIES — never
+    //      a role-blind union of every granted role's requirements. A role
+    //      that passed the coarser `allowedRoles` check above but has no
+    //      entry here is denied: `allowedRoles` only proves the role has
+    //      *some* grant on this key, not what scope it must satisfy.
+    let scope: OperationContext["scope"];
+    let resourceContextRequired: boolean;
+    let assignmentRequired: boolean;
+    let authScopeRequired: boolean;
+    let conditionIds: readonly string[] | undefined;
+    const authorizationMode = operationEntry?.authorizationMode ?? "DIRECT_PERMISSION";
+
+    if (operationEntry) {
+      scope = operationEntry.scope;
+      resourceContextRequired = operationEntry.resourceContextRequired;
+      assignmentRequired = operationEntry.assignmentRequired;
+      authScopeRequired = operationEntry.authScopeRequired;
+      // The 209-op map doesn't carry condition ids of its own; when an
+      // operation-level route needs COND, fall back to the role's own
+      // mapping rather than inventing operation-level condition data.
+      conditionIds = getRolePolicy(effectivePermissionKey, principal.role)?.conditionIds;
+    } else {
+      const rolePolicy = getRolePolicy(effectivePermissionKey, principal.role);
+      if (!rolePolicy) {
+        this.logger.warn(
+          `Denying request — no role policy for role "${principal.role}" on permission "${effectivePermissionKey}"`,
+        );
+        throw new PermissionDeniedException();
+      }
+      scope = rolePolicy.scopes;
+      resourceContextRequired = scope.some(
+        (s) => s === "OWN" || s === "ORG" || s === "ASG" || s === "PUB",
+      );
+      assignmentRequired = scope.includes("ASG");
+      authScopeRequired = scope.includes("AUTH_SCOPE");
+      conditionIds = rolePolicy.conditionIds;
+    }
+
+    if (scope.length === 0) {
+      return true;
+    }
+
+    const actor: ActorContext = {
+      userId: principal.userId,
+      role: principal.role,
+      employerId: principal.employerId,
+    };
+    const operation: OperationContext = {
+      apiId: declaredApiId ?? null,
+      permissionKey: effectivePermissionKey,
+      scope,
+      resourceContextRequired,
+      assignmentRequired,
+      authScopeRequired,
+      authorizationMode,
+      conditionIds,
+    };
+
+    const routeParams = (request.params ?? {}) as Readonly<Record<string, string>>;
+    const result = await this.scopeEvaluation.resolveAndEvaluate(
+      { actor, operation },
+      definition.domain,
+      routeParams,
+    );
+
+    if (!result.allowed) {
       this.logger.warn(
-        `Denying request — permission "${permissionKey}" requires scope [${definition.scope.join(", ")}] which has no evaluator yet (AUTHORIZATION_SCOPE_NOT_IMPLEMENTED)`,
+        `Denying request — scope evaluation failed for "${effectivePermissionKey}": ${result.reason ?? "unspecified"}`,
       );
       throw new PermissionDeniedException();
     }

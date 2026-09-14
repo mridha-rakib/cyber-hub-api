@@ -1,6 +1,12 @@
 import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { AuthModule } from "../../modules/auth/auth.module";
+import { ConditionRegistry } from "./authorization/condition-registry";
+import {
+  RESOURCE_CONTEXT_RESOLVERS,
+  ResourceContextResolverRegistry,
+} from "./authorization/resource-context-resolver";
+import { ScopeEvaluationService } from "./authorization/scope-evaluation.service";
 import { AuthGuard } from "./guards/auth.guard";
 import { PermissionGuard } from "./guards/permission.guard";
 
@@ -35,6 +41,20 @@ import { PermissionGuard } from "./guards/permission.guard";
   providers: [
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: PermissionGuard },
+    // Factory provider: ConditionRegistry's constructor takes a plain
+    // array, which Nest cannot resolve via implicit constructor-injection
+    // reflection (arrays have no distinct runtime provider token). This
+    // seeds it with the production DEFERRED-only condition catalogue — no
+    // resource resolvers or IMPLEMENTED conditions are registered here, by
+    // design: no product tables exist yet (Wave 0D-3 is framework-only).
+    { provide: ConditionRegistry, useFactory: () => new ConditionRegistry() },
+    // Empty by default in production (no product tables exist yet).
+    // Registered as a real provider — rather than left purely as an
+    // @Optional() injection — specifically so test modules can override it
+    // with test-only resolvers via `.overrideProvider(RESOURCE_CONTEXT_RESOLVERS)`.
+    { provide: RESOURCE_CONTEXT_RESOLVERS, useValue: [] },
+    ResourceContextResolverRegistry,
+    ScopeEvaluationService,
   ],
 })
 export class SecurityModule {}

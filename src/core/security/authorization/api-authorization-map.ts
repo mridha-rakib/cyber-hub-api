@@ -4648,3 +4648,26 @@ export const KNOWN_MAPPING_GAPS: readonly ApiMappingGap[] = [
       "Not an authorization-map ambiguity: the operation's classification/permissionKey/scope are unambiguous. The open item is a product/requirements gap (e.g. GAP-014 analytics query shape) unrelated to who may call the endpoint.",
   },
 ];
+
+/**
+ * Wave 0D-3: lookup support so routes can declare `@AuthorizeOperation(id)`
+ * against a known API ID and PermissionGuard can resolve the precise
+ * operation-level scope/assignment/AUTH_SCOPE flags instead of only the
+ * coarser permission-registry-level ones.
+ *
+ * `ApiId` is validated at runtime (via `isApiId`/`API_AUTHORIZATION_BY_ID`),
+ * the same pattern already used for `PermissionKey`/`isPermissionKey` —
+ * declaring an unknown id fails closed in the guard rather than being
+ * caught at compile time, since the 209 ids are not individually re-typed
+ * as string literals here (they're already the single source of truth
+ * inside API_AUTHORIZATION_MAP above).
+ */
+export type ApiId = string;
+
+const API_IDS_SET: ReadonlySet<string> = new Set(API_AUTHORIZATION_MAP.map((op) => op.apiId));
+
+export const isApiId = (value: string): value is ApiId => API_IDS_SET.has(value);
+
+export const API_AUTHORIZATION_BY_ID: ReadonlyMap<ApiId, ApiOperationAuthorization> = new Map(
+  API_AUTHORIZATION_MAP.map((op) => [op.apiId, op]),
+);
