@@ -67,3 +67,64 @@ export class DatabaseException extends AppException {
     });
   }
 }
+
+export class AuthRequiredException extends AppException {
+  constructor(message = "Authentication required", metadata?: Record<string, unknown>) {
+    super({
+      code: ErrorCodes.AUTH_REQUIRED,
+      statusCode: HttpStatus.UNAUTHORIZED,
+      message,
+      metadata,
+    });
+  }
+}
+
+export class InvalidCredentialsException extends AppException {
+  constructor(message = "Invalid email or password", metadata?: Record<string, unknown>) {
+    super({
+      code: ErrorCodes.INVALID_CREDENTIALS,
+      statusCode: HttpStatus.UNAUTHORIZED,
+      message,
+      metadata,
+    });
+  }
+}
+
+export class SessionExpiredException extends AppException {
+  constructor(message = "Session expired or revoked", metadata?: Record<string, unknown>) {
+    super({
+      code: ErrorCodes.SESSION_EXPIRED,
+      statusCode: HttpStatus.UNAUTHORIZED,
+      message,
+      metadata,
+    });
+  }
+}
+
+export class CsrfInvalidException extends AppException {
+  constructor(message = "Missing or invalid CSRF token", metadata?: Record<string, unknown>) {
+    super({ code: ErrorCodes.CSRF_INVALID, statusCode: HttpStatus.FORBIDDEN, message, metadata });
+  }
+}
+
+export class RateLimitedException extends AppException {
+  constructor(message = "Too many requests", metadata?: Record<string, unknown>) {
+    super({
+      code: ErrorCodes.RATE_LIMITED,
+      statusCode: HttpStatus.TOO_MANY_REQUESTS,
+      message,
+      metadata,
+    });
+  }
+}
+
+export class UniqueConstraintConflictException extends AppException {
+  constructor(message = "Resource already exists", metadata?: Record<string, unknown>) {
+    super({
+      code: ErrorCodes.UNIQUE_CONSTRAINT_CONFLICT,
+      statusCode: HttpStatus.CONFLICT,
+      message,
+      metadata,
+    });
+  }
+}

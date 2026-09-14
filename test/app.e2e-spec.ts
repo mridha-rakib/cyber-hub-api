@@ -39,7 +39,7 @@ describe("App foundation", () => {
   });
 
   it("publishes OpenAPI JSON when Swagger is enabled", async () => {
-    const response = await request(app.getHttpServer()).get("/api/docs-json").expect(200);
+    const response = await request(app.getHttpServer()).get("/api/v1/docs-json").expect(200);
     expect(response.body).toMatchObject({ info: { title: "Cyber Hub API", version: "1" } });
     expect(response.body.paths).toHaveProperty("/health");
     expect(response.body.components.securitySchemes).toHaveProperty("bearer");

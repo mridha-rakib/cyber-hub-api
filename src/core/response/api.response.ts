@@ -3,14 +3,14 @@ export interface ApiResponse<TData = unknown, TMeta = unknown> {
   message: string;
   data: TData;
   meta?: TMeta;
+  requestId: string;
 }
 
-export interface ApiErrorResponse<TMetadata = unknown> {
-  success: false;
-  code: string;
-  message: string;
+export interface ApiErrorResponse<TDetails = unknown> {
+  error: {
+    code: string;
+    message: string;
+    details?: TDetails;
+  };
   requestId: string;
-  timestamp: string;
-  path?: string;
-  metadata?: TMetadata;
 }

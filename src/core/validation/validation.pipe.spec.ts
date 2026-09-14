@@ -1,4 +1,4 @@
-import { BadRequestException } from "@nestjs/common";
+import { HttpException, HttpStatus } from "@nestjs/common";
 import { z } from "zod";
 import { ErrorCodes } from "../errors/error.codes";
 import { ValidationPipe } from "./validation.pipe";
@@ -13,18 +13,17 @@ describe("ValidationPipe", () => {
     });
   });
 
-  it("throws standardized validation errors", () => {
+  it("throws standardized validation errors with the contracted 422 status", () => {
     const schema = z.object({ email: z.string().email() });
     const pipe = new ValidationPipe(schema);
 
-    expect(() => pipe.transform({ email: "invalid" }, { type: "body" })).toThrow(
-      BadRequestException,
-    );
+    expect(() => pipe.transform({ email: "invalid" }, { type: "body" })).toThrow(HttpException);
 
     try {
       pipe.transform({ email: "invalid" }, { type: "body" });
     } catch (error) {
-      expect((error as BadRequestException).getResponse()).toMatchObject({
+      expect((error as HttpException).getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+      expect((error as HttpException).getResponse()).toMatchObject({
         code: ErrorCodes.VALIDATION_ERROR,
         message: "Validation failed",
       });

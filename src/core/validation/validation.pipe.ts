@@ -1,7 +1,8 @@
 import {
   type ArgumentMetadata,
+  HttpException,
+  HttpStatus,
   Injectable,
-  BadRequestException as NestBadRequestException,
   type PipeTransform,
 } from "@nestjs/common";
 import type { ZodType } from "zod";
@@ -19,11 +20,14 @@ export class ValidationPipe implements PipeTransform {
     const parsed = this.schema.safeParse(value);
 
     if (!parsed.success) {
-      throw new NestBadRequestException({
-        code: ErrorCodes.VALIDATION_ERROR,
-        message: "Validation failed",
-        errors: parsed.error.flatten(),
-      });
+      throw new HttpException(
+        {
+          code: ErrorCodes.VALIDATION_ERROR,
+          message: "Validation failed",
+          errors: parsed.error.flatten(),
+        },
+        HttpStatus.UNPROCESSABLE_ENTITY,
+      );
     }
 
     return parsed.data;

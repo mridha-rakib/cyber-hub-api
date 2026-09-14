@@ -33,15 +33,14 @@ export class ExceptionFilter implements NestExceptionFilter {
     else this.logger.warn("HTTP exception", fields);
 
     response.status(errorResponse.statusCode).json({
-      success: false,
-      code: errorResponse.code,
-      message: errorResponse.statusCode >= 500 ? "Internal server error" : errorResponse.message,
+      error: {
+        code: errorResponse.code,
+        message: errorResponse.statusCode >= 500 ? "Internal server error" : errorResponse.message,
+        ...(errorResponse.statusCode < 500 && errorResponse.metadata
+          ? { details: errorResponse.metadata }
+          : {}),
+      },
       requestId,
-      timestamp: new Date().toISOString(),
-      path: request.path,
-      ...(errorResponse.statusCode < 500 && errorResponse.metadata
-        ? { metadata: errorResponse.metadata }
-        : {}),
     });
   }
 

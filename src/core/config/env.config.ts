@@ -18,6 +18,15 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
+  APP_WEB_URL: z.string().url().default("http://localhost:3000"),
+  EMAIL_PROVIDER: z.enum(["resend", "dev"]).default("dev"),
+  RESEND_API_KEY: z.string().default(""),
+  EMAIL_FROM: z.string().min(1).default("no-reply@your-domain.com"),
+  SESSION_TTL_DAYS: z.coerce.number().int().positive().default(30),
+  EMAIL_VERIFICATION_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(1440),
+  PASSWORD_RESET_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(60),
+  AUTH_RATE_LIMIT_TTL_SECONDS: z.coerce.number().int().positive().default(60),
+  AUTH_RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(5),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
@@ -27,6 +36,16 @@ const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
   const errors = z.flattenError(parsed.error).fieldErrors;
   throw new Error(`Invalid environment configuration: ${JSON.stringify(errors)}`);
+}
+
+if (
+  parsed.data.NODE_ENV === "production" &&
+  parsed.data.EMAIL_PROVIDER === "resend" &&
+  !parsed.data.RESEND_API_KEY
+) {
+  throw new Error(
+    "Invalid environment configuration: RESEND_API_KEY is required when EMAIL_PROVIDER=resend in production",
+  );
 }
 
 export const envConfig: EnvConfig = parsed.data;

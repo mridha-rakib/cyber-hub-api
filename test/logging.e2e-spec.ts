@@ -104,7 +104,7 @@ describe("Logging foundation", () => {
     await Promise.all(
       Array.from({ length: 12 }, (_, index) =>
         request(app.getHttpServer())
-          .get("/api/logging-probe")
+          .get("/api/v1/logging-probe")
           .set("x-request-id", `req-${index}`)
           .expect(200),
       ),
@@ -123,7 +123,7 @@ describe("Logging foundation", () => {
 
   it("generates an ID and emits exactly one HTTP completion with safe metadata", async () => {
     const response = await request(app.getHttpServer())
-      .get("/api/logging-probe?accessToken=hidden-query")
+      .get("/api/v1/logging-probe?accessToken=hidden-query")
       .set("authorization", "Bearer hidden-header")
       .set("cookie", "session=hidden-cookie")
       .expect(200);
@@ -135,7 +135,7 @@ describe("Logging foundation", () => {
     expect(logs[0]).toMatchObject({
       requestId: id,
       method: "GET",
-      path: "/api/logging-probe",
+      path: "/api/v1/logging-probe",
       statusCode: 200,
       responseTime: expect.any(Number),
     });
@@ -155,7 +155,9 @@ describe("Logging foundation", () => {
   });
 
   it("records error details internally while returning a generic 500", async () => {
-    const response = await request(app.getHttpServer()).get("/api/logging-probe/error").expect(500);
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/logging-probe/error")
+      .expect(500);
     const errors = records().filter((entry) => entry.msg === "HTTP exception");
     expect(errors).toHaveLength(1);
     expect(errors[0]).toMatchObject({
@@ -169,13 +171,13 @@ describe("Logging foundation", () => {
       },
     });
     expect(output.join("")).not.toContain("dbsecret");
-    expect(response.body.message).toBe("Internal server error");
+    expect(response.body.error.message).toBe("Internal server error");
     expect(JSON.stringify(response.body)).not.toMatch(/stack|dbsecret|Database failed/);
     expect(records().filter((entry) => entry.msg === "HTTP request failed")).toHaveLength(1);
   });
 
   it("logs client errors at warn level", async () => {
-    await request(app.getHttpServer()).get("/api/logging-probe/invalid").expect(400);
+    await request(app.getHttpServer()).get("/api/v1/logging-probe/invalid").expect(400);
     expect(records().find((entry) => entry.msg === "HTTP exception")).toMatchObject({ level: 40 });
   });
 
@@ -183,7 +185,7 @@ describe("Logging foundation", () => {
     "logs malformed JSON without exposing the rejected body: %s",
     async (body) => {
       const response = await request(app.getHttpServer())
-        .post("/api/logging-probe")
+        .post("/api/v1/logging-probe")
         .set("Content-Type", "application/json")
         .send(body)
         .expect(400);

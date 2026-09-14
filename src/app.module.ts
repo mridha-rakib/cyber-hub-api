@@ -4,7 +4,8 @@ import {
   Module,
   type NestModule,
 } from "@nestjs/common";
-import { ThrottlerModule } from "@nestjs/throttler";
+import { APP_GUARD } from "@nestjs/core";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { json, type NextFunction, type Request, type Response, urlencoded } from "express";
 import { appConfig } from "./core/config/app.config";
 import { DatabaseModule } from "./core/database/database.module";
@@ -13,6 +14,8 @@ import { IdempotencyModule } from "./core/idempotency/idempotency.module";
 import { LoggerModule } from "./core/logger/logger.module";
 import { RequestContextModule } from "./core/request-context/request-context.module";
 import { SecurityModule } from "./core/security/security.module";
+import { EmailModule } from "./infrastructure/email/email.module";
+import { AuthModule } from "./modules/auth/auth.module";
 
 @Module({
   imports: [
@@ -22,13 +25,17 @@ import { SecurityModule } from "./core/security/security.module";
     SecurityModule,
     IdempotencyModule,
     HealthModule,
+    EmailModule,
+    AuthModule,
     ThrottlerModule.forRoot([
       {
-        ttl: appConfig.rateLimit.ttlSeconds,
+        name: "default",
+        ttl: appConfig.rateLimit.ttlSeconds * 1000,
         limit: appConfig.rateLimit.maxRequests,
       },
     ]),
   ],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
