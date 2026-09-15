@@ -14,6 +14,7 @@ import { IdempotencyModule } from "./core/idempotency/idempotency.module";
 import { LoggerModule } from "./core/logger/logger.module";
 import { RequestContextModule } from "./core/request-context/request-context.module";
 import { SecurityModule } from "./core/security/security.module";
+import { WorkflowModule } from "./core/workflow/workflow.module";
 import { EmailModule } from "./infrastructure/email/email.module";
 import { AuthModule } from "./modules/auth/auth.module";
 
@@ -23,6 +24,7 @@ import { AuthModule } from "./modules/auth/auth.module";
     RequestContextModule,
     DatabaseModule,
     SecurityModule,
+    WorkflowModule,
     IdempotencyModule,
     HealthModule,
     EmailModule,

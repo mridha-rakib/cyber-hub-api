@@ -146,3 +146,17 @@ export class UniqueConstraintConflictException extends AppException {
     });
   }
 }
+
+/**
+ * Wave 0D-6. Raised only after authorization has already succeeded (see
+ * workflow-transition.service.ts / Phase 12 precedence) — a stale
+ * `stateVersion` or a transition that is not valid from the resource's
+ * current persisted state. The external message is deliberately generic:
+ * it never echoes the actual current state, tenant identity, assignment,
+ * or AUTH_SCOPE details back to the client.
+ */
+export class WorkflowConflictException extends AppException {
+  constructor(message = "Resource state has changed", metadata?: Record<string, unknown>) {
+    super({ code: ErrorCodes.CONFLICT, statusCode: HttpStatus.CONFLICT, message, metadata });
+  }
+}
