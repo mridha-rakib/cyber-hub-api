@@ -1,8 +1,10 @@
+import { AuthScopeEvaluator } from "./auth-scope-evaluator.service";
 import type {
   ActorContext,
   AuthorizationContext,
   ResourceContext,
 } from "./authorization-context.types";
+import { SystemClock } from "./clock";
 import {
   type ConditionDefinition,
   ConditionRegistry,
@@ -20,6 +22,18 @@ import {
   evaluatePub,
   ScopeEvaluationService,
 } from "./scope-evaluation.service";
+import type { SecurityScopeAuthorizationRepository } from "./security-scope-authorization.repository";
+
+// A repository stub that always reports "no context" — sufficient for
+// every test in this file except the dedicated AUTH_SCOPE test suite
+// (auth-scope-evaluator.service.spec.ts), which exercises real validity/
+// linkage/target/activity logic against a controllable fake repository.
+const denyingAuthScopeRepository: Pick<
+  SecurityScopeAuthorizationRepository,
+  "loadAssessmentSecurityContext"
+> = {
+  loadAssessmentSecurityContext: async () => null,
+};
 
 const actor = (overrides: Partial<ActorContext> = {}): ActorContext => ({
   userId: "user-1",
@@ -42,7 +56,11 @@ function makeService(options?: {
     options?.resolver ? [options.resolver] : undefined,
   );
   const conditionRegistry = new ConditionRegistry(options?.conditions);
-  return new ScopeEvaluationService(registry, conditionRegistry);
+  const authScopeEvaluator = new AuthScopeEvaluator(
+    denyingAuthScopeRepository as SecurityScopeAuthorizationRepository,
+    new SystemClock(),
+  );
+  return new ScopeEvaluationService(registry, conditionRegistry, authScopeEvaluator);
 }
 
 function buildContext(
@@ -150,56 +168,60 @@ describe("pure evaluator functions", () => {
 });
 
 describe("ScopeEvaluationService.evaluate (pure composition, pre-resolved resource)", () => {
-  it("allows when scope is empty", () => {
+  it("allows when scope is empty", async () => {
     const service = makeService();
-    expect(service.evaluate(buildContext([]))).toEqual({ allowed: true });
+    await expect(service.evaluate(buildContext([]))).resolves.toEqual({ allowed: true });
   });
 
-  it("allows OWN when resource is pre-resolved and owner matches", () => {
+  it("allows OWN when resource is pre-resolved and owner matches", async () => {
     const service = makeService();
     const context = buildContext(["OWN"], { resource: resource({ ownerUserId: "user-1" }) });
-    expect(service.evaluate(context)).toEqual({ allowed: true });
+    await expect(service.evaluate(context)).resolves.toEqual({ allowed: true });
   });
 
-  it("denies OWN when owner differs, ignoring any client-spoofed userId on the resource-locator side", () => {
+  it("denies OWN when owner differs, ignoring any client-spoofed userId on the resource-locator side", async () => {
     const service = makeService();
     const context = buildContext(["OWN"], { resource: resource({ ownerUserId: "someone-else" }) });
-    expect(service.evaluate(context).allowed).toBe(false);
+    const result = await service.evaluate(context);
+    expect(result.allowed).toBe(false);
   });
 
-  it("denies when resourceContextRequired but resource is null", () => {
+  it("denies when resourceContextRequired but resource is null", async () => {
     const service = makeService();
     const context = buildContext(["OWN"], { resource: null });
-    expect(service.evaluate(context).allowed).toBe(false);
+    const result = await service.evaluate(context);
+    expect(result.allowed).toBe(false);
   });
 
-  it("forces DENY whenever AUTH_SCOPE is present, even if ASG would pass", () => {
+  it("denies AUTH_SCOPE when no assessmentId route locator is available, even if ASG would pass", async () => {
     const service = makeService();
     const context = buildContext(["ASG", "AUTH_SCOPE"], {
       resource: resource({ assignedUserIds: ["user-1"] }),
     });
-    const result = service.evaluate(context);
+    const result = await service.evaluate(context); // no routeParams -> no assessmentId
     expect(result.allowed).toBe(false);
     expect(result.reason).toMatch(/AUTH_SCOPE/);
   });
 
-  it("requires ALL mandatory scopes to pass (AND semantics) — one failing denies the whole request", () => {
+  it("requires ALL mandatory scopes to pass (AND semantics) — one failing denies the whole request", async () => {
     const service = makeService();
     // OWN passes, ORG fails (different employer) — must deny overall.
     const context = buildContext(["OWN", "ORG"], {
       actor: actor({ userId: "user-1", employerId: "emp-a" }),
       resource: resource({ ownerUserId: "user-1", employerId: "emp-b" }),
     });
-    expect(service.evaluate(context).allowed).toBe(false);
+    const result = await service.evaluate(context);
+    expect(result.allowed).toBe(false);
   });
 
-  it("allows when all mandatory scopes pass", () => {
+  it("allows when all mandatory scopes pass", async () => {
     const service = makeService();
     const context = buildContext(["OWN", "ORG"], {
       actor: actor({ userId: "user-1", employerId: "emp-a" }),
       resource: resource({ ownerUserId: "user-1", employerId: "emp-a" }),
     });
-    expect(service.evaluate(context).allowed).toBe(true);
+    const result = await service.evaluate(context);
+    expect(result.allowed).toBe(true);
   });
 
   describe("COND", () => {
@@ -221,17 +243,19 @@ describe("ScopeEvaluationService.evaluate (pure composition, pre-resolved resour
       });
     }
 
-    it("denies when the mapped condition is DEFERRED (production catalogue default)", () => {
+    it("denies when the mapped condition is DEFERRED (production catalogue default)", async () => {
       const service = makeService(); // production ConditionRegistry: all DEFERRED
-      expect(service.evaluate(condContext()).allowed).toBe(false);
+      const result = await service.evaluate(condContext());
+      expect(result.allowed).toBe(false);
     });
 
-    it("denies for an unknown condition id (not present in the registry)", () => {
+    it("denies for an unknown condition id (not present in the registry)", async () => {
       const service = makeService({ conditions: [] });
-      expect(service.evaluate(condContext()).allowed).toBe(false);
+      const result = await service.evaluate(condContext());
+      expect(result.allowed).toBe(false);
     });
 
-    it("denies when no condition id was resolved for this role at all", () => {
+    it("denies when no condition id was resolved for this role at all", async () => {
       const service = makeService();
       const context = buildContext(["COND"], {
         operation: {
@@ -245,10 +269,11 @@ describe("ScopeEvaluationService.evaluate (pure composition, pre-resolved resour
           conditionIds: undefined,
         },
       });
-      expect(service.evaluate(context).allowed).toBe(false);
+      const result = await service.evaluate(context);
+      expect(result.allowed).toBe(false);
     });
 
-    it("allows a test-only IMPLEMENTED condition that evaluates true", () => {
+    it("allows a test-only IMPLEMENTED condition that evaluates true", async () => {
       const testCondition: ConditionDefinition = {
         id: conditionId,
         description: "test-only override",
@@ -256,10 +281,10 @@ describe("ScopeEvaluationService.evaluate (pure composition, pre-resolved resour
         evaluate: () => true,
       };
       const service = makeService({ conditions: [testCondition] });
-      expect(service.evaluate(condContext())).toEqual({ allowed: true });
+      await expect(service.evaluate(condContext())).resolves.toEqual({ allowed: true });
     });
 
-    it("denies a test-only IMPLEMENTED condition that evaluates false", () => {
+    it("denies a test-only IMPLEMENTED condition that evaluates false", async () => {
       const testCondition: ConditionDefinition = {
         id: conditionId,
         description: "test-only override",
@@ -267,10 +292,11 @@ describe("ScopeEvaluationService.evaluate (pure composition, pre-resolved resour
         evaluate: () => false,
       };
       const service = makeService({ conditions: [testCondition] });
-      expect(service.evaluate(condContext()).allowed).toBe(false);
+      const result = await service.evaluate(condContext());
+      expect(result.allowed).toBe(false);
     });
 
-    it("denies when the condition evaluator throws", () => {
+    it("denies when the condition evaluator throws", async () => {
       const testCondition: ConditionDefinition = {
         id: conditionId,
         description: "test-only throwing condition",
@@ -280,10 +306,11 @@ describe("ScopeEvaluationService.evaluate (pure composition, pre-resolved resour
         },
       };
       const service = makeService({ conditions: [testCondition] });
-      expect(service.evaluate(condContext()).allowed).toBe(false);
+      const result = await service.evaluate(condContext());
+      expect(result.allowed).toBe(false);
     });
 
-    it("composes OWN + COND: both passing allows", () => {
+    it("composes OWN + COND: both passing allows", async () => {
       const testCondition: ConditionDefinition = {
         id: conditionId,
         description: "test-only",
@@ -304,10 +331,10 @@ describe("ScopeEvaluationService.evaluate (pure composition, pre-resolved resour
         },
         resource: resource({ ownerUserId: "user-1" }),
       });
-      expect(service.evaluate(context)).toEqual({ allowed: true });
+      await expect(service.evaluate(context)).resolves.toEqual({ allowed: true });
     });
 
-    it("does not apply another role's condition id when this role's policy carries none", () => {
+    it("does not apply another role's condition id when this role's policy carries none", async () => {
       // e.g. account.delete.request_own: ROLE_ADMIN's own policy has no
       // COND even though ROLE_BUSINESS/MENTOR/CONSULTANT do for the same
       // key — a route evaluating COND for a role with no conditionIds must
@@ -332,7 +359,8 @@ describe("ScopeEvaluationService.evaluate (pure composition, pre-resolved resour
           conditionIds: undefined, // Admin's ROLE_POLICIES entry has scopes: [] — never reaches this, but if it did, no conditionIds must still deny.
         },
       });
-      expect(service.evaluate(context).allowed).toBe(false);
+      const result = await service.evaluate(context);
+      expect(result.allowed).toBe(false);
     });
   });
 });

@@ -1,12 +1,15 @@
 import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { AuthModule } from "../../modules/auth/auth.module";
+import { AuthScopeEvaluator } from "./authorization/auth-scope-evaluator.service";
+import { CLOCK, SystemClock } from "./authorization/clock";
 import { ConditionRegistry } from "./authorization/condition-registry";
 import {
   RESOURCE_CONTEXT_RESOLVERS,
   ResourceContextResolverRegistry,
 } from "./authorization/resource-context-resolver";
 import { ScopeEvaluationService } from "./authorization/scope-evaluation.service";
+import { SecurityScopeAuthorizationRepository } from "./authorization/security-scope-authorization.repository";
 import { AuthGuard } from "./guards/auth.guard";
 import { PermissionGuard } from "./guards/permission.guard";
 
@@ -54,6 +57,13 @@ import { PermissionGuard } from "./guards/permission.guard";
     // with test-only resolvers via `.overrideProvider(RESOURCE_CONTEXT_RESOLVERS)`.
     { provide: RESOURCE_CONTEXT_RESOLVERS, useValue: [] },
     ResourceContextResolverRegistry,
+    // AUTH_SCOPE (Wave 0D-4B): real, DB-backed persistence chain. CLOCK is
+    // bound to the real SystemClock in production; tests inject a
+    // deterministic Clock directly into AuthScopeEvaluator without going
+    // through this module.
+    { provide: CLOCK, useClass: SystemClock },
+    SecurityScopeAuthorizationRepository,
+    AuthScopeEvaluator,
     ScopeEvaluationService,
   ],
 })

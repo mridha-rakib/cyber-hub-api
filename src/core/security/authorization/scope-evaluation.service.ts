@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { AuthScopeEvaluator } from "./auth-scope-evaluator.service";
 import type { AuthorizationContext, ResourceContext } from "./authorization-context.types";
 import { ConditionRegistry } from "./condition-registry";
 import { ResourceContextResolverRegistry } from "./resource-context-resolver";
@@ -49,15 +50,13 @@ export function evaluatePub(resource: ResourceContext | null): boolean {
 }
 
 /**
- * Orchestrates OWN/ORG/ASG/PUB/COND evaluation with AND (all-mandatory)
- * composition, resolves resource context via the registry, and — this is
- * the load-bearing safety property of this Wave — forces DENY whenever
- * AUTH_SCOPE is among the required scopes, since AUTH_SCOPE enforcement
- * does not exist until Wave 0D-4. AUTH_SCOPE presence short-circuits
- * before any resource resolution is attempted: the outcome is identical
- * either way (deny), and skipping resolution avoids depending on a
- * resolver that may not exist yet for a route that can never be allowed
- * in this Wave regardless.
+ * Orchestrates OWN/ORG/ASG/PUB/COND/AUTH_SCOPE evaluation with AND
+ * (all-mandatory) composition. OWN/ORG/ASG/PUB resolve resource context
+ * via `ResourceContextResolverRegistry`; AUTH_SCOPE (Wave 0D-4B) resolves
+ * its own authoritative context via `AuthScopeEvaluator`, backed by real
+ * `security_assessments`/`security_scope_authorizations` rows — these are
+ * two independent evidence sources that both compose into the same AND
+ * loop, never merged or allowed to substitute for one another.
  */
 @Injectable()
 export class ScopeEvaluationService {
@@ -66,6 +65,7 @@ export class ScopeEvaluationService {
   constructor(
     private readonly resolvers: ResourceContextResolverRegistry,
     private readonly conditions: ConditionRegistry,
+    private readonly authScope: AuthScopeEvaluator,
   ) {}
 
   /**
@@ -83,10 +83,6 @@ export class ScopeEvaluationService {
 
     if (scope.length === 0) return { allowed: true };
 
-    if (scope.includes("AUTH_SCOPE")) {
-      return { allowed: false, reason: "AUTH_SCOPE required — not implemented until Wave 0D-4" };
-    }
-
     const needsResource = this.needsResource(scope, operation.resourceContextRequired);
     let resource: ResourceContext | null = null;
     if (needsResource) {
@@ -99,24 +95,26 @@ export class ScopeEvaluationService {
       }
     }
 
-    return this.evaluate({ actor, operation, resource });
+    return this.evaluate({ actor, operation, resource }, routeParams);
   }
 
   /**
-   * Pure composition over an already-resolved `AuthorizationContext` — no
-   * resolver call. Used directly by unit tests exercising evaluator
-   * composition logic in isolation (per-evaluator fixtures), and internally
-   * by `resolveAndEvaluate` above.
+   * Composition over an already-resolved `AuthorizationContext`. `resource`
+   * (OWN/ORG/ASG/PUB) must already be resolved by the caller; AUTH_SCOPE
+   * resolves its own context internally via `AuthScopeEvaluator`, using
+   * `routeParams.assessmentId` strictly as a LOCATOR (Wave 0D-4B Phase 21
+   * — it identifies which row to load, it never itself proves
+   * authorization). Used directly by unit tests exercising composition
+   * logic in isolation, and internally by `resolveAndEvaluate` above.
    */
-  evaluate(context: AuthorizationContext): ScopeEvaluationResult {
+  async evaluate(
+    context: AuthorizationContext,
+    routeParams: Readonly<Record<string, string>> = {},
+  ): Promise<ScopeEvaluationResult> {
     const { actor, operation, resource } = context;
     const scope = operation.scope;
 
     if (scope.length === 0) return { allowed: true };
-
-    if (scope.includes("AUTH_SCOPE")) {
-      return { allowed: false, reason: "AUTH_SCOPE required — not implemented until Wave 0D-4" };
-    }
 
     if (this.needsResource(scope, operation.resourceContextRequired) && !resource) {
       return {
@@ -126,7 +124,13 @@ export class ScopeEvaluationService {
     }
 
     for (const scopeType of scope) {
-      const result = this.evaluateSingle(scopeType, actor, resource, operation.conditionIds);
+      const result = await this.evaluateSingle(
+        scopeType,
+        actor,
+        resource,
+        operation.conditionIds,
+        routeParams,
+      );
       if (!result.allowed) return result;
     }
 
@@ -140,12 +144,13 @@ export class ScopeEvaluationService {
     return resourceDependent || resourceContextRequired;
   }
 
-  private evaluateSingle(
+  private async evaluateSingle(
     scopeType: ScopeType,
     actor: AuthorizationContext["actor"],
     resource: ResourceContext | null,
     conditionIds: readonly string[] | undefined,
-  ): ScopeEvaluationResult {
+    routeParams: Readonly<Record<string, string>>,
+  ): Promise<ScopeEvaluationResult> {
     switch (scopeType) {
       case "OWN":
         return evaluateOwn(actor, resource)
@@ -166,18 +171,38 @@ export class ScopeEvaluationService {
       case "COND":
         return this.evaluateCond(conditionIds, actor, resource);
       case "AUTH_SCOPE":
-        // Unreachable: filtered out by the short-circuit above. Kept as an
-        // explicit fail-closed branch rather than an unchecked default.
-        return {
-          allowed: false,
-          reason: "AUTH_SCOPE reached evaluateSingle — should be unreachable",
-        };
+        return this.evaluateAuthScope(routeParams);
       default:
         return {
           allowed: false,
           reason: `unknown scope type "${scopeType satisfies never as string}"`,
         };
     }
+  }
+
+  /**
+   * AUTH_SCOPE (Wave 0D-4B). `routeParams.assessmentId` is used strictly as
+   * a locator to pick which `security_assessments` row to load — it is
+   * never itself treated as proof of authorization. Any missing locator,
+   * missing/malformed persisted evidence, or a failed validity/linkage/
+   * target/activity check denies.
+   */
+  private async evaluateAuthScope(
+    routeParams: Readonly<Record<string, string>>,
+  ): Promise<ScopeEvaluationResult> {
+    const assessmentId = routeParams.assessmentId;
+    if (!assessmentId) {
+      this.logger.warn("AUTH_SCOPE required but no assessmentId route locator was present");
+      return { allowed: false, reason: "AUTH_SCOPE: no assessmentId locator in route" };
+    }
+
+    const result = await this.authScope.evaluate({ assessmentId });
+    if (!result.allowed) {
+      this.logger.warn(
+        `AUTH_SCOPE denied for assessment ${assessmentId}: ${result.reason ?? "unspecified"}`,
+      );
+    }
+    return result;
   }
 
   /**
