@@ -37,6 +37,24 @@ export interface ResourceContextResolver {
 export const RESOURCE_CONTEXT_RESOLVERS = Symbol("RESOURCE_CONTEXT_RESOLVERS");
 
 /**
+ * Wave 0D-5 internal outcome model (Phase 6). `resolve()` below still
+ * collapses every failure mode to `null` for full backward compatibility
+ * with every existing resolver implementation/test — but the guard/
+ * evaluation layer needs to tell "the resolver ran and confirmed the
+ * record genuinely does not exist" (safe to expose as an unconditional
+ * 404) apart from "no resolver is even wired up" / "the resolver itself
+ * failed" (must keep failing closed the way it already does, and must
+ * never be presented to the client as proof the resource is absent —
+ * that would misrepresent an operational/configuration failure as a
+ * factual non-disclosure result).
+ */
+export type ResourceResolutionOutcome =
+  | { readonly status: "FOUND"; readonly resource: ResourceContext }
+  | { readonly status: "NOT_FOUND" }
+  | { readonly status: "NO_RESOLVER" }
+  | { readonly status: "RESOLVER_FAILURE" };
+
+/**
  * Small typed registry over one resolver per resource type — deliberately
  * not a giant switch statement. Resolvers register themselves via the
  * `RESOURCE_CONTEXT_RESOLVERS` multi-provider token; this service just
@@ -70,35 +88,51 @@ export class ResourceContextResolverRegistry {
    * resolver is registered, the resolver reports the resource doesn't
    * exist, or the resolver throws. Every one of these outcomes is treated
    * identically (fail closed) by the caller — this method never throws.
+   * Kept for backward compatibility; prefer `resolveOutcome` in new code
+   * that needs to distinguish genuine not-found from resolver failure.
    */
   async resolve(
     resourceType: string,
     input: ResourceResolutionInput,
   ): Promise<ResourceContext | null> {
+    const outcome = await this.resolveOutcome(resourceType, input);
+    return outcome.status === "FOUND" ? outcome.resource : null;
+  }
+
+  /**
+   * Same resolution as `resolve()`, but reports which specific failure
+   * mode occurred instead of collapsing them all to `null`. This method
+   * also never throws — every failure mode is a normal return value.
+   */
+  async resolveOutcome(
+    resourceType: string,
+    input: ResourceResolutionInput,
+  ): Promise<ResourceResolutionOutcome> {
     const resolver = this.resolversByType.get(resourceType);
     if (!resolver) {
       this.logger.warn(`No ResourceContextResolver registered for resourceType "${resourceType}"`);
-      return null;
+      return { status: "NO_RESOLVER" };
     }
 
     try {
       const resource = await resolver.resolve(input);
-      if (!resource) return null;
+      if (!resource) return { status: "NOT_FOUND" };
       if (resource.resourceType !== resourceType) {
         // A resolver returning a mismatched resourceType is a resolver bug,
-        // not a legitimate resource — never trust it.
+        // not a legitimate "confirmed absent" result — never trust it, and
+        // never let it masquerade as a genuine not-found.
         this.logger.error(
           `ResourceContextResolver for "${resourceType}" returned mismatched resourceType "${resource.resourceType}"`,
         );
-        return null;
+        return { status: "RESOLVER_FAILURE" };
       }
-      return resource;
+      return { status: "FOUND", resource };
     } catch (error) {
       this.logger.error(
         `ResourceContextResolver for "${resourceType}" threw — failing closed`,
         error as Error,
       );
-      return null;
+      return { status: "RESOLVER_FAILURE" };
     }
   }
 }

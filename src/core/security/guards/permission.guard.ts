@@ -6,6 +6,7 @@ import { IS_PUBLIC_ROUTE } from "../../../common/decorators/public.decorator";
 import {
   AppException,
   AuthorizationMisconfiguredException,
+  NotFoundException,
   PermissionDeniedException,
 } from "../../errors/app.exception";
 import {
@@ -15,6 +16,7 @@ import {
 } from "../authorization/api-authorization-map";
 import type { ActorContext, OperationContext } from "../authorization/authorization-context.types";
 import { API_OPERATION_METADATA } from "../authorization/authorize-operation.decorator";
+import { resolveDisclosurePolicy } from "../authorization/disclosure-policy";
 import { getOperationRolePolicy } from "../authorization/operation-role-policy";
 import { isPermissionKey, PERMISSION_REGISTRY } from "../authorization/permission-registry";
 import { PERMISSION_KEY_METADATA } from "../authorization/require-permission.decorator";
@@ -260,6 +262,32 @@ export class PermissionGuard implements CanActivate {
       this.logger.warn(
         `Denying request — scope evaluation failed for "${effectivePermissionKey}": ${result.reason ?? "unspecified"}`,
       );
+
+      // Wave 0D-5 (Phase 6/7/20). A confirmed-absent resource is always an
+      // unconditional 404 — this is a fact about the resource, not a
+      // disclosure-policy choice, and applies regardless of the
+      // operation's sensitivity classification.
+      if (result.outcome === "NOT_FOUND") {
+        throw new NotFoundException();
+      }
+
+      // Otherwise: authenticated, resource resolution did not affirmatively
+      // report "absent" (found-but-forbidden, or resolution unavailable —
+      // both fail closed identically), so the operation's own disclosure
+      // policy decides whether admitting a forbidden decision would itself
+      // leak sensitive existence. CONCEAL_EXISTENCE -> generic 404;
+      // DISCLOSE_FORBIDDEN/NOT_APPLICABLE -> ordinary 403. Never applied to
+      // the earlier role-check failure above: that branch responds
+      // identically for every resource id (existing or not), so it leaks
+      // no resource-specific existence signal and stays a plain 403.
+      const disclosurePolicy = resolveDisclosurePolicy(
+        effectivePermissionKey,
+        declaredApiId ?? null,
+        resourceContextRequired,
+      );
+      if (disclosurePolicy === "CONCEAL_EXISTENCE") {
+        throw new NotFoundException();
+      }
       throw new PermissionDeniedException();
     }
 

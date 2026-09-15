@@ -346,7 +346,7 @@ describe("Wave 0D-4B AUTH_SCOPE persistence + runtime enforcement", () => {
       await request(app.getHttpServer())
         .get(`/api/v1/test-auth-scope/assessment/${assessmentId}`)
         .set("Cookie", otherConsultant.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
 
     it("Consultant: denied when the scope authorization has been revoked, even though assigned", async () => {
@@ -364,7 +364,7 @@ describe("Wave 0D-4B AUTH_SCOPE persistence + runtime enforcement", () => {
       await request(app.getHttpServer())
         .get(`/api/v1/test-auth-scope/assessment/${assessmentId}`)
         .set("Cookie", consultant.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
 
     it("Consultant: denied when the scope authorization has expired (valid_until in the past)", async () => {
@@ -382,7 +382,7 @@ describe("Wave 0D-4B AUTH_SCOPE persistence + runtime enforcement", () => {
       await request(app.getHttpServer())
         .get(`/api/v1/test-auth-scope/assessment/${assessmentId}`)
         .set("Cookie", consultant.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
 
     it("Consultant: denied when the scope authorization is not yet valid (valid_from in the future)", async () => {
@@ -400,7 +400,7 @@ describe("Wave 0D-4B AUTH_SCOPE persistence + runtime enforcement", () => {
       await request(app.getHttpServer())
         .get(`/api/v1/test-auth-scope/assessment/${assessmentId}`)
         .set("Cookie", consultant.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
 
     it("Consultant: denied when the authorization is no longer current (superseded)", async () => {
@@ -418,7 +418,7 @@ describe("Wave 0D-4B AUTH_SCOPE persistence + runtime enforcement", () => {
       await request(app.getHttpServer())
         .get(`/api/v1/test-auth-scope/assessment/${assessmentId}`)
         .set("Cookie", consultant.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
 
     it("Consultant: denied when the activity performed is not covered by allowedActivities", async () => {
@@ -436,7 +436,7 @@ describe("Wave 0D-4B AUTH_SCOPE persistence + runtime enforcement", () => {
       await request(app.getHttpServer())
         .get(`/api/v1/test-auth-scope/assessment/${assessmentId}`)
         .set("Cookie", consultant.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
 
     it("Consultant: denied when authorized_targets is empty (no coverage evidence — treated as incomplete)", async () => {
@@ -454,7 +454,7 @@ describe("Wave 0D-4B AUTH_SCOPE persistence + runtime enforcement", () => {
       await request(app.getHttpServer())
         .get(`/api/v1/test-auth-scope/assessment/${assessmentId}`)
         .set("Cookie", consultant.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
 
     it("Consultant: denied when the linked authorization's employer disagrees with the assessment's own employer (data-integrity edge case)", async () => {
@@ -473,7 +473,7 @@ describe("Wave 0D-4B AUTH_SCOPE persistence + runtime enforcement", () => {
       await request(app.getHttpServer())
         .get(`/api/v1/test-auth-scope/assessment/${assessmentId}`)
         .set("Cookie", consultant.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
 
     it("Consultant: denied when no assessment exists for the given locator (nonexistent id — fails closed, not 404-vs-403 information leak)", async () => {
@@ -483,7 +483,7 @@ describe("Wave 0D-4B AUTH_SCOPE persistence + runtime enforcement", () => {
       await request(app.getHttpServer())
         .get("/api/v1/test-auth-scope/assessment/00000000-0000-0000-0000-000000000000")
         .set("Cookie", consultant.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
 
     it("Admin: allowed via AUTH_SCOPE alone when scope is valid — no ASG/assignment required for Admin", async () => {
@@ -571,7 +571,7 @@ describe("Wave 0D-4B AUTH_SCOPE persistence + runtime enforcement", () => {
       await request(app.getHttpServer())
         .get(`/api/v1/test-auth-scope/note/${assessmentId}`)
         .set("Cookie", otherConsultant.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
   });
 
@@ -600,7 +600,7 @@ describe("Wave 0D-4B AUTH_SCOPE persistence + runtime enforcement", () => {
           revokedAt: null,
           isCurrent: true,
         })
-        .expect(403);
+        .expect(404);
     });
 
     it("a spoofed body/query cannot substitute for a genuinely valid decision either — the real DB state alone determines the outcome (still 200 on real valid data)", async () => {

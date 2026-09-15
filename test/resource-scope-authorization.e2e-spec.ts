@@ -406,7 +406,7 @@ describe("Wave 0D-3 resource scope authorization", () => {
   }
 
   describe("OWN", () => {
-    it("allows the owning learner and denies a different learner for the same resource", async () => {
+    it("allows the owning learner and denies a different learner for the same resource as a generic 404 (portfolio.manage_own is CONCEAL_EXISTENCE, Wave 0D-5)", async () => {
       const owner = await registerAndLoginLearner("own-real");
       identities.learnerUserId = owner.userId;
       await request(app.getHttpServer())
@@ -418,31 +418,31 @@ describe("Wave 0D-3 resource scope authorization", () => {
       await request(app.getHttpServer())
         .get("/api/v1/test-scope/portfolio/own/own")
         .set("Cookie", stranger.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
 
-    it("denies when the resource is owned by someone else", async () => {
+    it("denies when the resource is owned by someone else — as 404, never confirming another learner's private portfolio exists", async () => {
       const { sessionCookie } = await registerAndLoginLearner("own-other");
       await request(app.getHttpServer())
         .get("/api/v1/test-scope/portfolio/own/other")
         .set("Cookie", sessionCookie)
-        .expect(403);
+        .expect(404);
     });
 
-    it("denies when the resolver returns null (missing resource)", async () => {
+    it("denies when the resolver returns null (missing resource) — unconditional 404 regardless of disclosure policy", async () => {
       const { sessionCookie } = await registerAndLoginLearner("own-missing");
       await request(app.getHttpServer())
         .get("/api/v1/test-scope/portfolio/own/missing")
         .set("Cookie", sessionCookie)
-        .expect(403);
+        .expect(404);
     });
 
-    it("denies when the resolver throws (malformed/failed resolution)", async () => {
+    it("denies when the resolver throws (malformed/failed resolution) — fails closed via disclosure policy (CONCEAL_EXISTENCE -> 404), never masquerading as a confirmed-allow", async () => {
       const { sessionCookie } = await registerAndLoginLearner("own-throws");
       await request(app.getHttpServer())
         .get("/api/v1/test-scope/portfolio/own/throws")
         .set("Cookie", sessionCookie)
-        .expect(403);
+        .expect(404);
     });
 
     it("Admin does not get an OWN bypass — must still match the authoritative owner", async () => {
@@ -493,12 +493,12 @@ describe("Wave 0D-3 resource scope authorization", () => {
         .expect(200);
     });
 
-    it("denies when the resource belongs to a different employer", async () => {
+    it("denies when the resource belongs to a different employer — as 404, never confirming another employer's private consulting request exists (tenant isolation, Wave 0D-5)", async () => {
       const business = await registerAndLoginBusiness("org-deny");
       await request(app.getHttpServer())
         .get("/api/v1/test-scope/consulting/org/other-org")
         .set("Cookie", business.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
 
     it("honors ROLE_ADMIN's own documented management-grant policy (no ORG requirement) rather than inheriting Business's ORG requirement", async () => {
@@ -529,17 +529,17 @@ describe("Wave 0D-3 resource scope authorization", () => {
       await request(app.getHttpServer())
         .get("/api/v1/test-scope/consulting/org/same-org")
         .set("Cookie", business.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
 
-    it("a spoofed employerId in the query string cannot establish ORG access", async () => {
+    it("a spoofed employerId in the query string cannot establish ORG access — still 404, never confirming the other employer's resource exists", async () => {
       const business = await registerAndLoginBusiness("org-spoof");
       await request(app.getHttpServer())
         .get(
           `/api/v1/test-scope/consulting/org/other-org?employerId=${identities.businessEmployerId}`,
         )
         .set("Cookie", business.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
   });
 
@@ -554,13 +554,13 @@ describe("Wave 0D-3 resource scope authorization", () => {
         .expect(200);
     });
 
-    it("denies an unassigned mentor", async () => {
+    it("denies an unassigned mentor — as 404, never confirming another mentor's assigned submission exists (assignment-only concealment, Wave 0D-5)", async () => {
       const mentor = await registerAndLoginLearner("asg-deny");
       await setRole(mentor.userId, "ROLE_MENTOR");
       await request(app.getHttpServer())
         .get("/api/v1/test-scope/submission/asg/unassigned")
         .set("Cookie", mentor.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
 
     it("denies when the assignment has been removed (empty assignedUserIds)", async () => {
@@ -570,16 +570,16 @@ describe("Wave 0D-3 resource scope authorization", () => {
       await request(app.getHttpServer())
         .get("/api/v1/test-scope/submission/asg/removed")
         .set("Cookie", mentor.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
 
-    it("a spoofed reviewerId/assigned=true body field cannot establish assignment", async () => {
+    it("a spoofed reviewerId/assigned=true body field cannot establish assignment — still 404", async () => {
       const mentor = await registerAndLoginLearner("asg-spoof");
       await setRole(mentor.userId, "ROLE_MENTOR");
       await request(app.getHttpServer())
         .get("/api/v1/test-scope/submission/asg/unassigned?assigned=true&reviewerId=self")
         .set("Cookie", mentor.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
   });
 
@@ -639,22 +639,22 @@ describe("Wave 0D-3 resource scope authorization", () => {
         .expect(200);
     });
 
-    it("denies when OWN fails even though COND would pass (AND composition, not OR)", async () => {
+    it("denies when OWN fails even though COND would pass (AND composition, not OR) — as 404, resource.progress.manage_own is CONCEAL_EXISTENCE", async () => {
       const stranger = await registerAndLoginLearner("comp-own-fails");
       await request(app.getHttpServer())
         .get("/api/v1/test-scope/resource-progress/own-cond/other")
         .set("Cookie", stranger.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
   });
 
   describe("resolver failures", () => {
-    it("denies when no resolver is registered for the resource's domain", async () => {
+    it("denies when no resolver is registered for the resource's domain — via disclosure policy (career.submit_own is CONCEAL_EXISTENCE), never masquerading as a confirmed allow", async () => {
       const business = await registerAndLoginBusiness("no-resolver");
       await request(app.getHttpServer())
         .get("/api/v1/test-scope/career/no-resolver/anything")
         .set("Cookie", business.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
   });
 
@@ -686,13 +686,13 @@ describe("Wave 0D-3 resource scope authorization", () => {
   });
 
   describe("Wave 0D-4 Part A — operation-level role alternation (API-REV-001)", () => {
-    it("Mentor is denied without assignment (ASG required for Mentor)", async () => {
+    it("Mentor is denied without assignment (ASG required for Mentor) — as 404, submission.review_assigned is CONCEAL_EXISTENCE", async () => {
       const mentor = await registerAndLoginLearner("op-alt-mentor-deny");
       await setRole(mentor.userId, "ROLE_MENTOR");
       await request(app.getHttpServer())
         .get("/api/v1/test-scope/operation-role-alternation/unassigned")
         .set("Cookie", mentor.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
 
     it("Mentor is allowed once assigned", async () => {
@@ -717,13 +717,13 @@ describe("Wave 0D-3 resource scope authorization", () => {
         .expect(200);
     });
 
-    it("Admin's role-only allow is never granted to Mentor (roles never merged in either direction)", async () => {
+    it("Admin's role-only allow is never granted to Mentor (roles never merged in either direction) — as 404", async () => {
       const mentor = await registerAndLoginLearner("op-alt-no-merge");
       await setRole(mentor.userId, "ROLE_MENTOR");
       await request(app.getHttpServer())
         .get("/api/v1/test-scope/operation-role-alternation/unassigned")
         .set("Cookie", mentor.sessionCookie)
-        .expect(403);
+        .expect(404);
     });
   });
 

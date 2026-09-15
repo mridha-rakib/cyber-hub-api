@@ -9,6 +9,18 @@ export interface ScopeEvaluationResult {
   readonly allowed: boolean;
   /** Which specific scope check failed first, for internal logging only — never sent to the client. */
   readonly reason?: string;
+  /**
+   * Wave 0D-5 (Phase 6/7). Set to "NOT_FOUND" only when a registered
+   * resolver actually ran and confirmed the resource does not exist — the
+   * one case PermissionGuard maps to an UNCONDITIONAL 404, regardless of
+   * the operation's disclosure policy. Every other `allowed: false` result
+   * (no resolver registered, resolver failure, or any OWN/ORG/ASG/PUB/
+   * COND/AUTH_SCOPE check failing on a resource that WAS found) leaves
+   * this unset and is instead gated by the operation's
+   * AuthorizationDisclosurePolicy (DISCLOSE_FORBIDDEN -> 403,
+   * CONCEAL_EXISTENCE -> 404) — see disclosure-policy.ts.
+   */
+  readonly outcome?: "NOT_FOUND";
 }
 
 /**
@@ -86,13 +98,28 @@ export class ScopeEvaluationService {
     const needsResource = this.needsResource(scope, operation.resourceContextRequired);
     let resource: ResourceContext | null = null;
     if (needsResource) {
-      resource = await this.resolvers.resolve(resourceType, { actor, routeParams });
-      if (!resource) {
+      const outcome = await this.resolvers.resolveOutcome(resourceType, { actor, routeParams });
+      if (outcome.status === "NOT_FOUND") {
+        // The resolver ran and affirmatively confirmed no such record
+        // exists — safe to report as an unconditional, generic 404
+        // regardless of the operation's disclosure policy.
+        return {
+          allowed: false,
+          outcome: "NOT_FOUND",
+          reason: `resource not found for resourceType "${resourceType}"`,
+        };
+      }
+      if (outcome.status !== "FOUND") {
+        // NO_RESOLVER / RESOLVER_FAILURE: unchanged fail-closed behavior —
+        // never presented as a confirmed "does not exist" result, since
+        // that would misrepresent a configuration/operational failure as
+        // a factual non-disclosure outcome (Wave 0D-5 Phase 6).
         return {
           allowed: false,
           reason: `no resource context resolved for resourceType "${resourceType}"`,
         };
       }
+      resource = outcome.resource;
     }
 
     return this.evaluate({ actor, operation, resource }, routeParams);
