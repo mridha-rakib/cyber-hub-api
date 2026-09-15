@@ -176,7 +176,10 @@ describe("ScopeEvaluationService.evaluate (pure composition, pre-resolved resour
   it("allows OWN when resource is pre-resolved and owner matches", async () => {
     const service = makeService();
     const context = buildContext(["OWN"], { resource: resource({ ownerUserId: "user-1" }) });
-    await expect(service.evaluate(context)).resolves.toEqual({ allowed: true });
+    await expect(service.evaluate(context)).resolves.toEqual({
+      allowed: true,
+      resource: resource({ ownerUserId: "user-1" }),
+    });
   });
 
   it("denies OWN when owner differs, ignoring any client-spoofed userId on the resource-locator side", async () => {
@@ -331,7 +334,10 @@ describe("ScopeEvaluationService.evaluate (pure composition, pre-resolved resour
         },
         resource: resource({ ownerUserId: "user-1" }),
       });
-      await expect(service.evaluate(context)).resolves.toEqual({ allowed: true });
+      await expect(service.evaluate(context)).resolves.toEqual({
+        allowed: true,
+        resource: resource({ ownerUserId: "user-1" }),
+      });
     });
 
     it("does not apply another role's condition id when this role's policy carries none", async () => {
@@ -492,7 +498,10 @@ describe("ScopeEvaluationService.resolveAndEvaluate (resolver-backed)", () => {
       "portfolio",
       { id: "res-1" },
     );
-    expect(result).toEqual({ allowed: true });
+    expect(result).toEqual({
+      allowed: true,
+      resource: resource({ resourceId: "res-1", ownerUserId: "user-1" }),
+    });
   });
 
   it("ignores a spoofed resource locator param used only to pick the record, not to prove ownership", async () => {

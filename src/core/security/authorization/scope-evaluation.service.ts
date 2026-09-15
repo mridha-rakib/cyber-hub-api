@@ -21,6 +21,17 @@ export interface ScopeEvaluationResult {
    * CONCEAL_EXISTENCE -> 404) — see disclosure-policy.ts.
    */
   readonly outcome?: "NOT_FOUND";
+  /**
+   * Wave 0D-7. The authoritative `ResourceContext` actually resolved via
+   * `ResourceContextResolverRegistry` (OWN/ORG/ASG/PUB path only — AUTH_SCOPE
+   * resolves its own separate evidence and never populates this field, by
+   * design; see evaluateAuthScope). Present on BOTH allow and deny outcomes
+   * whenever a resource was genuinely found, so the caller (PermissionGuard,
+   * for authorization-decision audit logging) can read already-resolved
+   * facts — entity id, tenant, owner — without issuing a second database
+   * lookup purely to enrich an audit row. Never set from client input.
+   */
+  readonly resource?: ResourceContext;
 }
 
 /**
@@ -158,10 +169,10 @@ export class ScopeEvaluationService {
         operation.conditionIds,
         routeParams,
       );
-      if (!result.allowed) return result;
+      if (!result.allowed) return resource ? { ...result, resource } : result;
     }
 
-    return { allowed: true };
+    return resource ? { allowed: true, resource } : { allowed: true };
   }
 
   private needsResource(scope: readonly ScopeType[], resourceContextRequired: boolean): boolean {

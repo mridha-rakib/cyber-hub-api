@@ -35,6 +35,6 @@ import { TokenLifecycleService } from "./services/token-lifecycle.service";
     PasswordResetService,
     SessionViewBuilder,
   ],
-  exports: [SessionService],
+  exports: [SessionService, AuditLogsRepository],
 })
 export class AuthModule {}

@@ -6,19 +6,39 @@ import { IS_PUBLIC_ROUTE } from "../../../common/decorators/public.decorator";
 import {
   AppException,
   AuthorizationMisconfiguredException,
+  DatabaseException,
   NotFoundException,
   PermissionDeniedException,
 } from "../../errors/app.exception";
 import {
   API_AUTHORIZATION_BY_ID,
+  type ApiId,
   type ApiOperationAuthorization,
   isApiId,
 } from "../authorization/api-authorization-map";
-import type { ActorContext, OperationContext } from "../authorization/authorization-context.types";
+import { AuthorizationAuditService } from "../authorization/authorization-audit.service";
+import { mapScopeFailureReasonToAuditCode } from "../authorization/authorization-audit-reason.util";
+import type {
+  ActorContext,
+  OperationContext,
+  ResourceContext,
+} from "../authorization/authorization-context.types";
+import type {
+  AuthorizationAuditReason,
+  AuthorizationDecision,
+  SafeAuditResourceContext,
+} from "../authorization/authorization-decision.types";
 import { API_OPERATION_METADATA } from "../authorization/authorize-operation.decorator";
-import { resolveDisclosurePolicy } from "../authorization/disclosure-policy";
+import {
+  type AuthorizationDisclosurePolicy,
+  resolveDisclosurePolicy,
+} from "../authorization/disclosure-policy";
 import { getOperationRolePolicy } from "../authorization/operation-role-policy";
-import { isPermissionKey, PERMISSION_REGISTRY } from "../authorization/permission-registry";
+import {
+  isPermissionKey,
+  PERMISSION_REGISTRY,
+  type PermissionKey,
+} from "../authorization/permission-registry";
 import { PERMISSION_KEY_METADATA } from "../authorization/require-permission.decorator";
 import { getRolePolicy } from "../authorization/role-policy";
 import { ScopeEvaluationService } from "../authorization/scope-evaluation.service";
@@ -45,6 +65,7 @@ export class PermissionGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly scopeEvaluation: ScopeEvaluationService,
+    private readonly authorizationAudit: AuthorizationAuditService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -163,6 +184,18 @@ export class PermissionGuard implements CanActivate {
     // Role-level check. ROLE_ADMIN receives no shortcut: it must appear in
     // this specific key's allowedRoles, exactly like every other role.
     if (!definition.allowedRoles.includes(principal.role)) {
+      // Wave 0D-7 Phase 17: audited (when auditRequired) as a safe DENY —
+      // never with resource/tenant/subject context, since no resource
+      // resolution has happened yet at this point in the pipeline and none
+      // is performed solely to enrich this row.
+      await this.auditDenyIfRequired(operationEntry, {
+        apiId: declaredApiId as ApiId,
+        permissionKey: effectivePermissionKey,
+        principal,
+        reasonCode: "ROLE_NOT_ALLOWED",
+        evaluatedScopes: [],
+        resourceContextRequired: false,
+      });
       throw new PermissionDeniedException();
     }
 
@@ -232,6 +265,16 @@ export class PermissionGuard implements CanActivate {
     }
 
     if (scope.length === 0) {
+      // Wave 0D-7 Phase 15/27: a plain role-only grant. Audited as ALLOW
+      // (when auditRequired) with no resource context — none was resolved
+      // or needed for this operation.
+      await this.auditAllowIfRequired(operationEntry, {
+        apiId: declaredApiId as ApiId,
+        permissionKey: effectivePermissionKey,
+        principal,
+        evaluatedScopes: [],
+        resourceContextRequired: false,
+      });
       return true;
     }
 
@@ -268,6 +311,17 @@ export class PermissionGuard implements CanActivate {
       // disclosure-policy choice, and applies regardless of the
       // operation's sensitivity classification.
       if (result.outcome === "NOT_FOUND") {
+        await this.auditDenyIfRequired(operationEntry, {
+          apiId: declaredApiId as ApiId,
+          permissionKey: effectivePermissionKey,
+          principal,
+          reasonCode: "RESOURCE_NOT_FOUND",
+          evaluatedScopes: scope,
+          resourceContextRequired,
+          // Wave 0D-7 Phase 11: a genuinely NOT_FOUND resource has no
+          // authoritative resource context to record — never write an
+          // untrusted route locator as though it were a verified entity id.
+        });
         throw new NotFoundException();
       }
 
@@ -285,12 +339,158 @@ export class PermissionGuard implements CanActivate {
         declaredApiId ?? null,
         resourceContextRequired,
       );
+
+      // Wave 0D-7 Phase 14/19: the audit row records the safe typed reason
+      // and (only when authoritatively resolved) resource context — never
+      // the external response. Whether this is ultimately a 404 or 403 to
+      // the caller is decided immediately below, independent of auditing.
+      await this.auditDenyIfRequired(operationEntry, {
+        apiId: declaredApiId as ApiId,
+        permissionKey: effectivePermissionKey,
+        principal,
+        reasonCode: mapScopeFailureReasonToAuditCode(result.reason),
+        evaluatedScopes: scope,
+        resourceContextRequired,
+        resource: toSafeAuditResource(result.resource),
+        disclosurePolicyOverride: disclosurePolicy,
+      });
+
       if (disclosurePolicy === "CONCEAL_EXISTENCE") {
         throw new NotFoundException();
       }
       throw new PermissionDeniedException();
     }
 
+    await this.auditAllowIfRequired(operationEntry, {
+      apiId: declaredApiId as ApiId,
+      permissionKey: effectivePermissionKey,
+      principal,
+      evaluatedScopes: scope,
+      resourceContextRequired,
+      resource: result.resource,
+    });
+
     return true;
   }
+
+  /**
+   * Wave 0D-7 Phase 8/24. Both audit helpers below are the ONLY place
+   * PermissionGuard talks to AuthorizationAuditService — every call site
+   * above passes already-trusted, already-resolved context, never request
+   * body/query. `operationEntry` (and therefore `auditRequired`) is only
+   * ever non-undefined when `declaredApiId` was validated via `isApiId`
+   * earlier in `evaluate()`, so the `apiId as ApiId` casts at each call
+   * site are safe by construction, not an unchecked assumption.
+   */
+  private async auditAllowIfRequired(
+    operationEntry: ApiOperationAuthorization | undefined,
+    input: {
+      apiId: ApiId;
+      permissionKey: PermissionKey;
+      principal: { userId: string; role: ActorContext["role"] };
+      evaluatedScopes: OperationContext["scope"];
+      resourceContextRequired: boolean;
+      resource?: SafeAuditResourceContext;
+    },
+  ): Promise<void> {
+    if (!operationEntry?.auditRequired) return;
+
+    const disclosurePolicy = resolveDisclosurePolicy(
+      input.permissionKey,
+      input.apiId,
+      input.resourceContextRequired,
+    );
+
+    const decision: AuthorizationDecision = {
+      decision: "ALLOW",
+      apiId: input.apiId,
+      permissionKey: input.permissionKey,
+      actorUserId: input.principal.userId,
+      actorRole: input.principal.role,
+      evaluatedScopes: input.evaluatedScopes,
+      resource: input.resource,
+      disclosurePolicy,
+      workflowSensitive: operationEntry.workflowValidationRequired,
+      authScopeRequired: operationEntry.authScopeRequired,
+    };
+
+    // Phase 24-A: a required audit write must never silently fail open.
+    // The handler must not execute if this throws.
+    try {
+      await this.authorizationAudit.recordDecision(decision);
+    } catch (error) {
+      this.logger.error(
+        `Required authorization ALLOW audit write failed for "${input.apiId}" — failing closed`,
+        error as Error,
+      );
+      throw new DatabaseException();
+    }
+  }
+
+  private async auditDenyIfRequired(
+    operationEntry: ApiOperationAuthorization | undefined,
+    input: {
+      apiId: ApiId;
+      permissionKey: PermissionKey;
+      principal: { userId: string; role: ActorContext["role"] };
+      reasonCode: AuthorizationAuditReason;
+      evaluatedScopes: OperationContext["scope"];
+      resourceContextRequired: boolean;
+      resource?: SafeAuditResourceContext;
+      disclosurePolicyOverride?: AuthorizationDisclosurePolicy;
+    },
+  ): Promise<void> {
+    if (!operationEntry?.auditRequired) return;
+
+    const disclosurePolicy =
+      input.disclosurePolicyOverride ??
+      resolveDisclosurePolicy(input.permissionKey, input.apiId, input.resourceContextRequired);
+
+    const decision: AuthorizationDecision = {
+      decision: "DENY",
+      apiId: input.apiId,
+      permissionKey: input.permissionKey,
+      actorUserId: input.principal.userId,
+      actorRole: input.principal.role,
+      reasonCode: input.reasonCode,
+      evaluatedScopes: input.evaluatedScopes,
+      resource: input.resource,
+      disclosurePolicy,
+      workflowSensitive: operationEntry.workflowValidationRequired,
+      authScopeRequired: operationEntry.authScopeRequired,
+    };
+
+    // Phase 24-B: the external denial (401/403/404) is ALREADY decided and
+    // must never be altered by an audit-subsystem failure — a concealed
+    // 404 must never become a 500 (that would itself be a side channel).
+    // Log-and-continue only; never rethrow, never retry via another audit
+    // write (Phase 25 — no recursion).
+    try {
+      await this.authorizationAudit.recordDecision(decision);
+    } catch (error) {
+      this.logger.error(
+        `Authorization DENY audit write failed for "${input.apiId}" — external response unaffected`,
+        error as Error,
+      );
+    }
+  }
+}
+
+/**
+ * Wave 0D-7 Phase 13. Explicitly picks only the 4 audit-safe fields off an
+ * already-authoritative `ResourceContext` — never passes the whole object
+ * through. `assignedUserIds`/`conditionFacts`/any future resolver-added
+ * field never reaches the audit path even by accident, regardless of what
+ * a resolver puts on the object at runtime.
+ */
+function toSafeAuditResource(
+  resource: ResourceContext | undefined,
+): SafeAuditResourceContext | undefined {
+  if (!resource) return undefined;
+  return {
+    resourceType: resource.resourceType,
+    resourceId: resource.resourceId,
+    ownerUserId: resource.ownerUserId,
+    employerId: resource.employerId,
+  };
 }

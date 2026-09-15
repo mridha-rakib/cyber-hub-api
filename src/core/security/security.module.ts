@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { AuthModule } from "../../modules/auth/auth.module";
 import { AuthScopeEvaluator } from "./authorization/auth-scope-evaluator.service";
+import { AuthorizationAuditService } from "./authorization/authorization-audit.service";
 import { CLOCK, SystemClock } from "./authorization/clock";
 import { ConditionRegistry } from "./authorization/condition-registry";
 import {
@@ -65,6 +66,10 @@ import { PermissionGuard } from "./guards/permission.guard";
     SecurityScopeAuthorizationRepository,
     AuthScopeEvaluator,
     ScopeEvaluationService,
+    // Wave 0D-7: central authorization-decision audit write path. Reuses
+    // AuthModule's existing AuditLogsRepository (now exported for this
+    // purpose) and the globally-registered RequestContextService.
+    AuthorizationAuditService,
   ],
 })
 export class SecurityModule {}
