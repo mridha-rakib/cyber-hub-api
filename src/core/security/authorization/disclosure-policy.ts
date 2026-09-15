@@ -47,6 +47,12 @@ const CONCEAL_EXISTENCE_KEYS: ReadonlySet<PermissionKey> = new Set<PermissionKey
   // Security domain (Phase 12): consulting requests, assessments,
   // AUTH_SCOPE authorizations, findings, scores, reports -- all sensitive
   // "business/client security record" categories named explicitly.
+  // Wave 0D-8 re-verification: DIRECTLY confirmed by RBAC & Permission
+  // Matrix v1.0 RBAC-AC-003 ("Business cannot read or mutate another
+  // business/employer's consulting, assessment, score, finding or report
+  // data" -- Tenant/object authorization tests) and RBAC-AC-005
+  // ("Consultant can access only assigned/authorised client security
+  // work" -- Assignment/scope security tests). No longer analogy-only.
   "assessment.manage_assigned",
   "assessment.read_client",
   "consulting.internal_note.manage",
@@ -60,6 +66,17 @@ const CONCEAL_EXISTENCE_KEYS: ReadonlySet<PermissionKey> = new Set<PermissionKey
   "report.release_client",
   // Business-private paid security monitoring engagement -- same category
   // as consulting requests (a specific tenant's security service record).
+  // Wave 0D-8 re-verification: RBAC v1.0 §6 confirms these are COND-gated
+  // ("C/V ORG COND" / "M COND" -- see role-policy.ts's
+  // MONITORING_SUBSCRIPTION_ACTIVE/MONITORING_ADMIN_FEATURE_ENABLED
+  // conditions), but no RBAC-AC item or other source row explicitly
+  // states existence-concealment for monitoring subscriptions the way
+  // RBAC-AC-003 does for consulting/assessment/score/finding/report.
+  // REMAINS A JUDGMENT CALL: kept as CONCEAL_EXISTENCE by direct analogy
+  // to the explicitly-cited consulting/assessment category (monitoring is
+  // the same kind of tenant-private paid security engagement record), not
+  // reclassified absent a contradicting source. See Outstanding Product/
+  // Policy Clarifications in the Wave 0D-8 report.
   "monitoring.admin_manage",
   "monitoring.read_choose_own",
   // Cross-tenant business-private data (tenant isolation, Phase 9):
@@ -69,6 +86,11 @@ const CONCEAL_EXISTENCE_KEYS: ReadonlySet<PermissionKey> = new Set<PermissionKey
   // Private learner/user data (OWN concealment, Phase 10), matching the UI
   // Screen Inventory's documented "forbidden/non-disclosure" / "404/
   // non-owner" states for these exact resources.
+  // Wave 0D-8 re-verification: DIRECTLY confirmed by RBAC-AC-002
+  // ("Learner cannot read or mutate another learner's private profile,
+  // portfolio, application, task evidence or certificate-private data" --
+  // Object-level authorization tests). No longer analogy-only for
+  // portfolio/application/submission("task evidence")/certificate.
   "certificate.read_own",
   "internship.application.read_own",
   "internship.task.read_assigned",
@@ -78,15 +100,26 @@ const CONCEAL_EXISTENCE_KEYS: ReadonlySet<PermissionKey> = new Set<PermissionKey
   "submission.create_update_own",
   // Assignment-only sensitive resources (ASG concealment, Phase 11):
   // reviewing another mentor/consultant's assignee's private work must not
-  // confirm the assignment/submission/enrollment exists.
+  // confirm the assignment/submission/enrollment exists. Wave 0D-8: RBAC-
+  // AC-004 ("Mentor can review only assigned submissions/completion
+  // evidence") directly supports completion.review_assigned/
+  // submission.review_assigned.
   "completion.review_assigned",
   "submission.review_assigned",
   // Admin-issued credential tied to one specific learner's private
   // enrollment record (distinct from the certificate's own later public
-  // verification route, which is governed separately by PUB).
+  // verification route, which is governed separately by PUB). Same
+  // RBAC-AC-002 "task evidence"/enrollment-private-data category.
   "certificate.issue_manage",
   // Other users' private audit trail / financial records -- sensitive by
-  // nature even though only Admin may ever legitimately reach them.
+  // nature even though only Admin may ever legitimately reach them. Wave
+  // 0D-8 re-verification: RBAC v1.0 §6 describes `audit.read` as "Admin
+  // permissions; sensitive metadata minimized" and `donation.reporting.
+  // read_manage` as "No public donor management grant" -- both consistent
+  // with, but not a literal existence-concealment statement equivalent to
+  // RBAC-AC-002/003. REMAINS A JUDGMENT CALL, kept conservative (conceal)
+  // rather than relaxed, absent a contradicting source. See Outstanding
+  // Product/Policy Clarifications.
   "audit.read",
   "donation.reporting.read_manage",
 ]);
@@ -137,6 +170,17 @@ const NOT_APPLICABLE_KEYS: ReadonlySet<PermissionKey> = new Set<PermissionKey>([
  * API-TSK-001..004 operate on `{internshipId}`/`{taskId}` (admin-authored
  * task/programme template content, not a specific learner's data -- same
  * class as `internship.program.manage`).
+ *
+ * Wave 0D-8 re-verification: RBAC & Permission Matrix v1.0 RBAC-AC-002
+ * ("Learner cannot read or mutate another learner's private ... task
+ * evidence ... data" -- Object-level authorization tests) DIRECTLY
+ * supports the ENR-004/005 (learner-enrollment) half of this split as
+ * CONCEAL_EXISTENCE; RBAC v1.0 §6's own `internship.task.manage_assign`
+ * row ("C/V/U/M | Admin" -- FR-ADM-007, Admin-only, no per-role scope
+ * suffix) supports the TSK-001..004 (admin-authored task-template) half
+ * remaining a plain Admin-console DISCLOSE_FORBIDDEN, consistent with
+ * every other Admin-only content-management key in this file. Confirmed
+ * unchanged; no correction required.
  */
 const OPERATION_DISCLOSURE_OVERRIDES: ReadonlyMap<ApiId, AuthorizationDisclosurePolicy> = new Map([
   ["API-ENR-004", "CONCEAL_EXISTENCE"],
