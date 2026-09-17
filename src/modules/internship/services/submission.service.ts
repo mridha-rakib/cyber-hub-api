@@ -4,12 +4,12 @@ import {
   NotFoundException,
   WorkflowConflictException,
 } from "../../../core/errors/app.exception";
+import { requireTransition } from "../../../core/workflow/workflow-helper";
 import type { SubmissionCreateInput, SubmissionResubmitInput } from "../dto/submission.dto";
 import { InternshipEnrollmentsRepository } from "../repositories/internship-enrollments.repository";
 import { SubmissionVersionsRepository } from "../repositories/submission-versions.repository";
 import { SubmissionsRepository } from "../repositories/submissions.repository";
 import { TaskAssignmentsRepository } from "../repositories/task-assignments.repository";
-import { requireTransition } from "../workflow-helper";
 
 @Injectable()
 export class SubmissionService {

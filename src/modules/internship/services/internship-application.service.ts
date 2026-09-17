@@ -5,11 +5,11 @@ import {
   NotFoundException,
   WorkflowConflictException,
 } from "../../../core/errors/app.exception";
+import { requireTransition } from "../../../core/workflow/workflow-helper";
 import type { InternshipApplicationInput } from "../dto/application.dto";
 import { InternshipApplicationsRepository } from "../repositories/internship-applications.repository";
 import { InternshipEnrollmentsRepository } from "../repositories/internship-enrollments.repository";
 import { InternshipsRepository } from "../repositories/internships.repository";
-import { requireTransition } from "../workflow-helper";
 import type { ListParams } from "./internship-programme.service";
 
 @Injectable()

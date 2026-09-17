@@ -4,10 +4,10 @@ import {
   NotFoundException,
   WorkflowConflictException,
 } from "../../../core/errors/app.exception";
+import { requireTransition } from "../../../core/workflow/workflow-helper";
 import type { InternshipUpdateInput, InternshipWriteInput } from "../dto/internship-write.dto";
 import { InternshipApplicationsRepository } from "../repositories/internship-applications.repository";
 import { InternshipsRepository } from "../repositories/internships.repository";
-import { requireTransition } from "../workflow-helper";
 
 export interface ListParams {
   readonly cursor?: string;

@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { NotFoundException, WorkflowConflictException } from "../../../core/errors/app.exception";
+import { requireTransition } from "../../../core/workflow/workflow-helper";
 import type { ReviewApprovalInput, RevisionRequestInput } from "../dto/review.dto";
 import { SubmissionsRepository } from "../repositories/submissions.repository";
-import { requireTransition } from "../workflow-helper";
 import type { ListParams } from "./internship-programme.service";
 
 @Injectable()

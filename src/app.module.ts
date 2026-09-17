@@ -17,7 +17,9 @@ import { SecurityModule } from "./core/security/security.module";
 import { WorkflowModule } from "./core/workflow/workflow.module";
 import { EmailModule } from "./infrastructure/email/email.module";
 import { AuthModule } from "./modules/auth/auth.module";
+import { CertificateModule } from "./modules/certificate/certificate.module";
 import { InternshipModule } from "./modules/internship/internship.module";
+import { PortfolioModule } from "./modules/portfolio/portfolio.module";
 
 @Module({
   imports: [
@@ -31,6 +33,8 @@ import { InternshipModule } from "./modules/internship/internship.module";
     EmailModule,
     AuthModule,
     InternshipModule,
+    CertificateModule,
+    PortfolioModule,
     ThrottlerModule.forRoot([
       {
         name: "default",

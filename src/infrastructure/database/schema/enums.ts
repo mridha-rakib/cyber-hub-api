@@ -102,3 +102,13 @@ export const submissionStatus = pgEnum("submission_status", [
   "APPROVED",
   "REVISION_REQUIRED",
 ]);
+
+/**
+ * ERD §7.26 certificates.status: "ISSUED | REVOKED" (source: WF-CERT,
+ * State & Workflow Spec v1.0 §4). No `state_version` column is documented
+ * for this table — the Wave 0D-6 `Certificate` workflow registry entry
+ * exists, but the CAS mechanism for the revoke transition uses `status`
+ * itself as the compare key (see `certificates.repository.ts`'s
+ * `revoke()`), not a separate integer counter.
+ */
+export const certificateStatus = pgEnum("certificate_status", ["ISSUED", "REVOKED"]);

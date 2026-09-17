@@ -1,11 +1,20 @@
 import { relations } from "drizzle-orm";
 import { auditLogs } from "./audit-logs";
 import { authTokens } from "./auth-tokens";
+import { certificates } from "./certificates";
 import { consultingRequests } from "./consulting-requests";
 import { employers } from "./employers";
 import { internshipApplications } from "./internship-applications";
 import { internshipEnrollments } from "./internship-enrollments";
 import { internships } from "./internships";
+import { portfolioAchievements } from "./portfolio-achievements";
+import { portfolioCertificates } from "./portfolio-certificates";
+import { portfolioCertifications } from "./portfolio-certifications";
+import { portfolioEvidence } from "./portfolio-evidence";
+import { portfolioLinks } from "./portfolio-links";
+import { portfolioProjects } from "./portfolio-projects";
+import { portfolioSkills } from "./portfolio-skills";
+import { portfolios } from "./portfolios";
 import { securityAssessments } from "./security-assessments";
 import { securityScopeAuthorizations } from "./security-scope-authorizations";
 import { sessions } from "./sessions";
@@ -223,5 +232,98 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   employer: one(employers, {
     fields: [auditLogs.employerId],
     references: [employers.id],
+  }),
+}));
+
+export const certificatesRelations = relations(certificates, ({ one, many }) => ({
+  user: one(users, {
+    fields: [certificates.userId],
+    references: [users.id],
+    relationName: "certificateRecipient",
+  }),
+  programme: one(internships, {
+    fields: [certificates.programmeId],
+    references: [internships.id],
+  }),
+  enrollment: one(internshipEnrollments, {
+    fields: [certificates.enrollmentId],
+    references: [internshipEnrollments.id],
+  }),
+  revokedByUser: one(users, {
+    fields: [certificates.revokedByUserId],
+    references: [users.id],
+    relationName: "certificateRevoker",
+  }),
+  portfolioEntries: many(portfolioCertificates),
+}));
+
+export const portfoliosRelations = relations(portfolios, ({ one, many }) => ({
+  user: one(users, {
+    fields: [portfolios.userId],
+    references: [users.id],
+  }),
+  projects: many(portfolioProjects),
+  links: many(portfolioLinks),
+  skills: many(portfolioSkills),
+  certifications: many(portfolioCertifications),
+  evidence: many(portfolioEvidence),
+  achievements: many(portfolioAchievements),
+  certificates: many(portfolioCertificates),
+}));
+
+export const portfolioProjectsRelations = relations(portfolioProjects, ({ one }) => ({
+  portfolio: one(portfolios, {
+    fields: [portfolioProjects.portfolioId],
+    references: [portfolios.id],
+  }),
+}));
+
+export const portfolioLinksRelations = relations(portfolioLinks, ({ one }) => ({
+  portfolio: one(portfolios, {
+    fields: [portfolioLinks.portfolioId],
+    references: [portfolios.id],
+  }),
+}));
+
+export const portfolioSkillsRelations = relations(portfolioSkills, ({ one }) => ({
+  portfolio: one(portfolios, {
+    fields: [portfolioSkills.portfolioId],
+    references: [portfolios.id],
+  }),
+}));
+
+export const portfolioCertificationsRelations = relations(portfolioCertifications, ({ one }) => ({
+  portfolio: one(portfolios, {
+    fields: [portfolioCertifications.portfolioId],
+    references: [portfolios.id],
+  }),
+}));
+
+export const portfolioEvidenceRelations = relations(portfolioEvidence, ({ one }) => ({
+  portfolio: one(portfolios, {
+    fields: [portfolioEvidence.portfolioId],
+    references: [portfolios.id],
+  }),
+}));
+
+export const portfolioAchievementsRelations = relations(portfolioAchievements, ({ one }) => ({
+  portfolio: one(portfolios, {
+    fields: [portfolioAchievements.portfolioId],
+    references: [portfolios.id],
+  }),
+  internship: one(internships, {
+    fields: [portfolioAchievements.internshipId],
+    references: [internships.id],
+  }),
+}));
+
+export const portfolioCertificatesRelations = relations(portfolioCertificates, ({ one }) => ({
+  portfolio: one(portfolios, {
+    fields: [portfolioCertificates.portfolioId],
+    references: [portfolios.id],
+  }),
+  certificate: one(certificates, {
+    fields: [portfolioCertificates.certificateId],
+    references: [certificates.id],
   }),
 }));

@@ -22,6 +22,13 @@
       "when": 1789524891252,
       "tag": "0002_majestic_shape",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789629441641,
+      "tag": "0003_legal_christian_walker",
+      "breakpoints": true
     }
   ]
 }

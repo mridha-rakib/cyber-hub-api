@@ -221,14 +221,13 @@ describe("Wave 0D-2 authorization foundation", () => {
     });
   });
 
-  describe("scope-sensitive permissions fail closed (no OWN/ORG/ASG/AUTH_SCOPE evaluator yet)", () => {
-    it("denies the OWN-scoped permission even for the exact role it's granted to — as a generic 404, since portfolio.manage_own is CONCEAL_EXISTENCE (Wave 0D-5) and no resolver is wired in this fixture module", async () => {
+  describe("scope-sensitive permissions fail closed absent a real resolver (ASG/AUTH_SCOPE still unwired for this fixture's domain; OWN now has a real Wave 2 'portfolio' resolver)", () => {
+    it("allows the OWN-scoped permission for the exact role it's granted to, now that Wave 2 wires a real 'portfolio' resolver — this fixture route has no resource-id locator, so it hits the same self-referential 'collection endpoint' convention as the real /me/portfolio routes, and OWN passes structurally", async () => {
       const { sessionCookie } = await registerAndLoginLearner();
-      const response = await request(app.getHttpServer())
+      await request(app.getHttpServer())
         .get("/api/v1/test-authz/scope-sensitive-own")
         .set("Cookie", sessionCookie)
-        .expect(404);
-      expect(response.body.error.code).toBe("NOT_FOUND");
+        .expect(200);
     });
 
     it("denies the ASG+AUTH_SCOPE-scoped permission for ROLE_ADMIN too", async () => {
