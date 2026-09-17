@@ -58,3 +58,47 @@ export const assessmentStatus = pgEnum("assessment_status", [
   "COMPLETED",
   "CANCELLED",
 ]);
+
+/**
+ * ERD §7.19 internships.status: "DRAFT | PUBLISHED | CLOSED | ARCHIVED"
+ * (source: WF-PRG, State & Workflow Spec v1.0 §3.1). Values only — the
+ * WF-PRG-01..04 transition commands live in the Wave 0D-6 workflow
+ * registry; this Wave (1) implements the real controller/service behind
+ * them for the first time.
+ */
+export const internshipStatus = pgEnum("internship_status", [
+  "DRAFT",
+  "PUBLISHED",
+  "CLOSED",
+  "ARCHIVED",
+]);
+
+/**
+ * ERD §7.20 internship_applications.status: "SUBMITTED | UNDER_REVIEW |
+ * ACCEPTED | REJECTED" (source: WF-APP, State & Workflow Spec v1.0 §3.2).
+ */
+export const applicationStatus = pgEnum("application_status", [
+  "SUBMITTED",
+  "UNDER_REVIEW",
+  "ACCEPTED",
+  "REJECTED",
+]);
+
+/**
+ * ERD §7.21 internship_enrollments.completion_eligibility: "NOT_ELIGIBLE |
+ * ELIGIBLE" (source: State & Workflow Spec v1.0 §3.5 — a derived gate,
+ * explicitly NOT a Certificate status and NOT a state machine; there is no
+ * named transition command for this value, it is computed).
+ */
+export const completionEligibility = pgEnum("completion_eligibility", ["NOT_ELIGIBLE", "ELIGIBLE"]);
+
+/**
+ * ERD §7.24 submissions.status: "SUBMITTED | UNDER_REVIEW | APPROVED |
+ * REVISION_REQUIRED" (source: WF-SUB, State & Workflow Spec v1.0 §3.4).
+ */
+export const submissionStatus = pgEnum("submission_status", [
+  "SUBMITTED",
+  "UNDER_REVIEW",
+  "APPROVED",
+  "REVISION_REQUIRED",
+]);

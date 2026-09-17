@@ -1,6 +1,10 @@
 import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { AuthModule } from "../../modules/auth/auth.module";
+import { InternshipModule } from "../../modules/internship/internship.module";
+import { CompletionResourceResolver } from "../../modules/internship/resolvers/completion-resource.resolver";
+import { InternshipResourceResolver } from "../../modules/internship/resolvers/internship-resource.resolver";
+import { SubmissionResourceResolver } from "../../modules/internship/resolvers/submission-resource.resolver";
 import { AuthScopeEvaluator } from "./authorization/auth-scope-evaluator.service";
 import { AuthorizationAuditService } from "./authorization/authorization-audit.service";
 import { CLOCK, SystemClock } from "./authorization/clock";
@@ -41,7 +45,7 @@ import { PermissionGuard } from "./guards/permission.guard";
  * route — see permission.guard.ts for what happens when neither is present.
  */
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, InternshipModule],
   providers: [
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: PermissionGuard },
@@ -49,14 +53,24 @@ import { PermissionGuard } from "./guards/permission.guard";
     // array, which Nest cannot resolve via implicit constructor-injection
     // reflection (arrays have no distinct runtime provider token). This
     // seeds it with the production DEFERRED-only condition catalogue — no
-    // resource resolvers or IMPLEMENTED conditions are registered here, by
-    // design: no product tables exist yet (Wave 0D-3 is framework-only).
+    // IMPLEMENTED conditions are registered here, by design.
     { provide: ConditionRegistry, useFactory: () => new ConditionRegistry() },
-    // Empty by default in production (no product tables exist yet).
-    // Registered as a real provider — rather than left purely as an
-    // @Optional() injection — specifically so test modules can override it
-    // with test-only resolvers via `.overrideProvider(RESOURCE_CONTEXT_RESOLVERS)`.
-    { provide: RESOURCE_CONTEXT_RESOLVERS, useValue: [] },
+    // Wave 1: real resolvers for the "internship"/"submission"/"completion"
+    // permission domains, sourced from InternshipModule's exports. Nest has
+    // no `multi: true` for plain providers, so — same pattern as
+    // ConditionRegistry above — this is a factory composing an explicit
+    // array, not a re-declared empty placeholder. Extending this list is
+    // the intended way for a future product module to register its own
+    // resolver (see `resource-context-resolver.ts`'s own doc comment).
+    {
+      provide: RESOURCE_CONTEXT_RESOLVERS,
+      useFactory: (
+        internship: InternshipResourceResolver,
+        submission: SubmissionResourceResolver,
+        completion: CompletionResourceResolver,
+      ) => [internship, submission, completion],
+      inject: [InternshipResourceResolver, SubmissionResourceResolver, CompletionResourceResolver],
+    },
     ResourceContextResolverRegistry,
     // AUTH_SCOPE (Wave 0D-4B): real, DB-backed persistence chain. CLOCK is
     // bound to the real SystemClock in production; tests inject a

@@ -17,6 +17,7 @@ import { SecurityModule } from "./core/security/security.module";
 import { WorkflowModule } from "./core/workflow/workflow.module";
 import { EmailModule } from "./infrastructure/email/email.module";
 import { AuthModule } from "./modules/auth/auth.module";
+import { InternshipModule } from "./modules/internship/internship.module";
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { AuthModule } from "./modules/auth/auth.module";
     HealthModule,
     EmailModule,
     AuthModule,
+    InternshipModule,
     ThrottlerModule.forRoot([
       {
         name: "default",

@@ -15,6 +15,13 @@
       "when": 1789378716032,
       "tag": "0001_fresh_ma_gnuci",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789524891252,
+      "tag": "0002_majestic_shape",
+      "breakpoints": true
     }
   ]
 }
