@@ -3,10 +3,12 @@ import { auditLogs } from "./audit-logs";
 import { authTokens } from "./auth-tokens";
 import { certificates } from "./certificates";
 import { consultingRequests } from "./consulting-requests";
+import { employerOpportunities } from "./employer-opportunities";
 import { employers } from "./employers";
 import { internshipApplications } from "./internship-applications";
 import { internshipEnrollments } from "./internship-enrollments";
 import { internships } from "./internships";
+import { jobs } from "./jobs";
 import { portfolioAchievements } from "./portfolio-achievements";
 import { portfolioCertificates } from "./portfolio-certificates";
 import { portfolioCertifications } from "./portfolio-certifications";
@@ -30,6 +32,8 @@ export const employersRelations = relations(employers, ({ many }) => ({
   consultingRequests: many(consultingRequests),
   securityScopeAuthorizations: many(securityScopeAuthorizations),
   securityAssessments: many(securityAssessments),
+  careerListings: many(jobs),
+  opportunities: many(employerOpportunities),
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -49,6 +53,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   confirmedScopeAuthorizations: many(securityScopeAuthorizations),
   assignedSecurityAssessments: many(securityAssessments),
+  submittedCareerListings: many(jobs),
+  createdOpportunities: many(employerOpportunities),
 }));
 
 export const consultingRequestsRelations = relations(consultingRequests, ({ one, many }) => ({
@@ -325,5 +331,27 @@ export const portfolioCertificatesRelations = relations(portfolioCertificates, (
   certificate: one(certificates, {
     fields: [portfolioCertificates.certificateId],
     references: [certificates.id],
+  }),
+}));
+
+export const jobsRelations = relations(jobs, ({ one }) => ({
+  employer: one(employers, {
+    fields: [jobs.employerId],
+    references: [employers.id],
+  }),
+  submittedByUser: one(users, {
+    fields: [jobs.submittedByUserId],
+    references: [users.id],
+  }),
+}));
+
+export const employerOpportunitiesRelations = relations(employerOpportunities, ({ one }) => ({
+  employer: one(employers, {
+    fields: [employerOpportunities.employerId],
+    references: [employers.id],
+  }),
+  createdByUser: one(users, {
+    fields: [employerOpportunities.createdByUserId],
+    references: [users.id],
   }),
 }));

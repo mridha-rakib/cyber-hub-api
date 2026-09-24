@@ -112,3 +112,38 @@ export const submissionStatus = pgEnum("submission_status", [
  * `revoke()`), not a separate integer counter.
  */
 export const certificateStatus = pgEnum("certificate_status", ["ISSUED", "REVOKED"]);
+
+/**
+ * ERD §6 Enum Catalogue: "career_listing_type | JOB, INTERNSHIP,
+ * GRADUATE_ROLE, APPRENTICESHIP | SRS UK Career" — used by §7.9 `jobs`.
+ */
+export const careerListingType = pgEnum("career_listing_type", [
+  "JOB",
+  "INTERNSHIP",
+  "GRADUATE_ROLE",
+  "APPRENTICESHIP",
+]);
+
+/**
+ * ERD §6 Enum Catalogue: "listing_status | SUBMITTED, UNDER_REVIEW,
+ * PUBLISHED, REJECTED, CLOSED | WF-LST" — the shared Employer Opportunity /
+ * Career Listing Moderation lifecycle (State & Workflow Spec v1.0 §5),
+ * used by both §7.9 `jobs` and §7.10 `employer_opportunities`.
+ */
+export const listingStatus = pgEnum("listing_status", [
+  "SUBMITTED",
+  "UNDER_REVIEW",
+  "PUBLISHED",
+  "REJECTED",
+  "CLOSED",
+]);
+
+/**
+ * ERD §6 Enum Catalogue: "employer_opportunity_type |
+ * INTERNSHIP_OPPORTUNITY, STUDENT_PROJECT | Employer portal" — used by
+ * §7.10 `employer_opportunities`.
+ */
+export const employerOpportunityType = pgEnum("employer_opportunity_type", [
+  "INTERNSHIP_OPPORTUNITY",
+  "STUDENT_PROJECT",
+]);
