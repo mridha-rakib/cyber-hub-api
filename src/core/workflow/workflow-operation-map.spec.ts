@@ -73,4 +73,17 @@ describe("workflow-operation-map — Wave 0D-6 Phase 7 coverage validation", () 
     for (const id of flaggedIds) expect(mappedIds.has(id)).toBe(true);
     for (const id of mappedIds) expect(flaggedIds.has(id)).toBe(true);
   });
+
+  it("Wave 3B correction: API-BIZCAR-004/API-BIZOPP-004 PATCH is REJECTED-only, not SUBMITTED — API Contract v1.1 and UI Screen Inventory v1.1 both state 'REJECTED only'; the prior SUBMITTED entry was an unconfirmed Wave 0D judgment call", () => {
+    expect(WORKFLOW_OPERATION_MAP["API-BIZCAR-004"]).toMatchObject({
+      kind: "EDIT_GUARD",
+      entityType: "CareerListing",
+      allowedStates: ["REJECTED"],
+    });
+    expect(WORKFLOW_OPERATION_MAP["API-BIZOPP-004"]).toMatchObject({
+      kind: "EDIT_GUARD",
+      entityType: "EmployerOpportunity",
+      allowedStates: ["REJECTED"],
+    });
+  });
 });

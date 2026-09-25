@@ -17,6 +17,7 @@ import { SecurityModule } from "./core/security/security.module";
 import { WorkflowModule } from "./core/workflow/workflow.module";
 import { EmailModule } from "./infrastructure/email/email.module";
 import { AuthModule } from "./modules/auth/auth.module";
+import { CareerModule } from "./modules/career/career.module";
 import { CertificateModule } from "./modules/certificate/certificate.module";
 import { InternshipModule } from "./modules/internship/internship.module";
 import { PortfolioModule } from "./modules/portfolio/portfolio.module";
@@ -35,6 +36,7 @@ import { PortfolioModule } from "./modules/portfolio/portfolio.module";
     InternshipModule,
     CertificateModule,
     PortfolioModule,
+    CareerModule,
     ThrottlerModule.forRoot([
       {
         name: "default",

@@ -1,6 +1,9 @@
 import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { AuthModule } from "../../modules/auth/auth.module";
+import { CareerModule } from "../../modules/career/career.module";
+import { CareerResourceResolver } from "../../modules/career/resolvers/career-resource.resolver";
+import { EmployerOpportunityResourceResolver } from "../../modules/career/resolvers/employer-opportunity-resource.resolver";
 import { CertificateModule } from "../../modules/certificate/certificate.module";
 import { CertificateResourceResolver } from "../../modules/certificate/resolvers/certificate-resource.resolver";
 import { InternshipModule } from "../../modules/internship/internship.module";
@@ -49,7 +52,7 @@ import { PermissionGuard } from "./guards/permission.guard";
  * route — see permission.guard.ts for what happens when neither is present.
  */
 @Module({
-  imports: [AuthModule, InternshipModule, CertificateModule, PortfolioModule],
+  imports: [AuthModule, InternshipModule, CertificateModule, PortfolioModule, CareerModule],
   providers: [
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: PermissionGuard },
@@ -59,9 +62,10 @@ import { PermissionGuard } from "./guards/permission.guard";
     // seeds it with the production DEFERRED-only condition catalogue — no
     // IMPLEMENTED conditions are registered here, by design.
     { provide: ConditionRegistry, useFactory: () => new ConditionRegistry() },
-    // Wave 1/2: real resolvers for the "internship"/"submission"/
-    // "completion"/"certificate"/"portfolio" permission domains, sourced
-    // from each product module's exports. Nest has no `multi: true` for
+    // Wave 1/2/3B: real resolvers for the "internship"/"submission"/
+    // "completion"/"certificate"/"portfolio"/"career"/"employer" permission
+    // domains, sourced from each product module's exports. Nest has no
+    // `multi: true` for
     // plain providers, so — same pattern as ConditionRegistry above — this
     // is a factory composing an explicit array, not a re-declared empty
     // placeholder. Extending this list is the intended way for a future
@@ -75,13 +79,25 @@ import { PermissionGuard } from "./guards/permission.guard";
         completion: CompletionResourceResolver,
         certificate: CertificateResourceResolver,
         portfolio: PortfolioResourceResolver,
-      ) => [internship, submission, completion, certificate, portfolio],
+        career: CareerResourceResolver,
+        employerOpportunity: EmployerOpportunityResourceResolver,
+      ) => [
+        internship,
+        submission,
+        completion,
+        certificate,
+        portfolio,
+        career,
+        employerOpportunity,
+      ],
       inject: [
         InternshipResourceResolver,
         SubmissionResourceResolver,
         CompletionResourceResolver,
         CertificateResourceResolver,
         PortfolioResourceResolver,
+        CareerResourceResolver,
+        EmployerOpportunityResourceResolver,
       ],
     },
     ResourceContextResolverRegistry,

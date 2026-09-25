@@ -90,10 +90,16 @@ export const WORKFLOW_OPERATION_MAP: Readonly<Partial<Record<ApiId, WorkflowOper
     entityType: "CareerListing",
     transitionIds: ["WF-LST-01"],
   },
+  // Wave 3B correction: API Contract v1.1 ("Edit own REJECTED listing
+  // before resubmission; status immutable. ... State: REJECTED only") and
+  // UI Screen Inventory v1.1 (identical "REJECTED only" wording) both
+  // directly document PATCH as REJECTED-only — the prior SUBMITTED entry
+  // was a conservative Wave 0D judgment call, not a documented state, and
+  // is corrected here rather than preserved.
   "API-BIZCAR-004": {
     kind: "EDIT_GUARD",
     entityType: "CareerListing",
-    allowedStates: ["SUBMITTED", "REJECTED"],
+    allowedStates: ["REJECTED"],
   },
   "API-BIZCAR-005": {
     kind: "TRANSITION",
@@ -112,10 +118,12 @@ export const WORKFLOW_OPERATION_MAP: Readonly<Partial<Record<ApiId, WorkflowOper
     entityType: "EmployerOpportunity",
     transitionIds: ["WF-LST-01"],
   },
+  // Wave 3B correction: same "REJECTED only" source citation as
+  // API-BIZCAR-004 above.
   "API-BIZOPP-004": {
     kind: "EDIT_GUARD",
     entityType: "EmployerOpportunity",
-    allowedStates: ["SUBMITTED", "REJECTED"],
+    allowedStates: ["REJECTED"],
   },
   "API-BIZOPP-005": {
     kind: "TRANSITION",
