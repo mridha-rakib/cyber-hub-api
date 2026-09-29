@@ -11,4 +11,11 @@ describe("CI configuration", () => {
     expect(workflow).toContain("npm run build");
     expect(workflow).toContain("node-version: 22");
   });
+
+  it("keeps Nest incremental metadata inside the disposable build output", async () => {
+    const tsconfig = JSON.parse(
+      await readFile(resolve(__dirname, "../tsconfig.build.json"), "utf8"),
+    );
+    expect(tsconfig.compilerOptions.tsBuildInfoFile).toBe("./dist/tsconfig.build.tsbuildinfo");
+  });
 });

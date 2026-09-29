@@ -38,13 +38,9 @@ if (!parsed.success) {
   throw new Error(`Invalid environment configuration: ${JSON.stringify(errors)}`);
 }
 
-if (
-  parsed.data.NODE_ENV === "production" &&
-  parsed.data.EMAIL_PROVIDER === "resend" &&
-  !parsed.data.RESEND_API_KEY
-) {
+if (parsed.data.EMAIL_PROVIDER === "resend" && !parsed.data.RESEND_API_KEY) {
   throw new Error(
-    "Invalid environment configuration: RESEND_API_KEY is required when EMAIL_PROVIDER=resend in production",
+    "Invalid environment configuration: RESEND_API_KEY is required when EMAIL_PROVIDER=resend",
   );
 }
 
