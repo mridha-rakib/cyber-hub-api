@@ -12,21 +12,20 @@ import {
   employerOpportunityUpdateSchema,
 } from "../dto/employer-opportunity.dto";
 import {
+  type AdminOpportunityListQuery,
+  adminOpportunityListQuerySchema,
+  type OwnOpportunityListQuery,
+  ownOpportunityListQuerySchema,
+  type PublicOpportunityListQuery,
+  publicOpportunityListQuerySchema,
+} from "../dto/list-query.dto";
+import {
   type ReasonTransitionInput,
   reasonTransitionSchema,
   type TransitionInput,
   transitionSchema,
 } from "../dto/transition.dto";
 import { EmployerOpportunityService } from "../services/employer-opportunity.service";
-
-const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 100;
-
-function clampLimit(limit?: string): number {
-  const parsed = limit ? Number.parseInt(limit, 10) : DEFAULT_LIMIT;
-  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_LIMIT;
-  return Math.min(parsed, MAX_LIMIT);
-}
 
 @Controller()
 export class EmployerOpportunitiesController {
@@ -35,12 +34,10 @@ export class EmployerOpportunitiesController {
   @Public()
   @Get("opportunities")
   listPublished(
-    @Query("type") type?: string,
-    @Query("skill") skill?: string,
-    @Query("cursor") cursor?: string,
-    @Query("limit") limit?: string,
+    @Query(new ValidationPipe(publicOpportunityListQuerySchema))
+    query: PublicOpportunityListQuery,
   ) {
-    return this.opportunityService.listPublished({ type, skill, cursor, limit: clampLimit(limit) });
+    return this.opportunityService.listPublished(query);
   }
 
   @Public()
@@ -63,17 +60,9 @@ export class EmployerOpportunitiesController {
   @Get("business/opportunities")
   listOwn(
     @CurrentUser() principal: AuthPrincipal,
-    @Query("type") type?: string,
-    @Query("status") status?: string,
-    @Query("cursor") cursor?: string,
-    @Query("limit") limit?: string,
+    @Query(new ValidationPipe(ownOpportunityListQuerySchema)) query: OwnOpportunityListQuery,
   ) {
-    return this.opportunityService.listOwn(requireEmployerId(principal), {
-      type,
-      status,
-      cursor,
-      limit: clampLimit(limit),
-    });
+    return this.opportunityService.listOwn(requireEmployerId(principal), query);
   }
 
   @AuthorizeOperation("API-BIZOPP-003")
@@ -114,19 +103,9 @@ export class EmployerOpportunitiesController {
   @AuthorizeOperation("API-MOD-002")
   @Get("admin/opportunities")
   listAdmin(
-    @Query("status") status?: string,
-    @Query("employerId") employerId?: string,
-    @Query("type") type?: string,
-    @Query("cursor") cursor?: string,
-    @Query("limit") limit?: string,
+    @Query(new ValidationPipe(adminOpportunityListQuerySchema)) query: AdminOpportunityListQuery,
   ) {
-    return this.opportunityService.listAdmin({
-      status,
-      employerId,
-      type,
-      cursor,
-      limit: clampLimit(limit),
-    });
+    return this.opportunityService.listAdmin(query);
   }
 
   @AuthorizeOperation("API-MOD-OPP-01")

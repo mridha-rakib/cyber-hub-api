@@ -6,6 +6,7 @@ import type {
   EmployerOpportunityInput,
   EmployerOpportunityUpdateInput,
 } from "../dto/employer-opportunity.dto";
+import { buildCursorPage, CAREER_CURSOR_KINDS } from "../pagination/cursor-pagination";
 import {
   type AdminOpportunityListFilter,
   EmployerOpportunitiesRepository,
@@ -45,7 +46,14 @@ export class EmployerOpportunityService {
   /** API-EMP-001. Public, PUBLISHED-only — never widened by any caller input. */
   async listPublished(filter: PublicOpportunityListFilter) {
     const opportunities = await this.opportunitiesRepository.findPublishedList(filter);
-    return opportunities.map(toPublicView);
+    const page = buildCursorPage(
+      opportunities,
+      filter.limit,
+      CAREER_CURSOR_KINDS.opportunityPublished,
+      (opportunity) => opportunity.publishedAt,
+      (opportunity) => opportunity.id,
+    );
+    return { data: page.data.map(toPublicView), meta: page.meta };
   }
 
   /** API-EMP-002. Public — a non-PUBLISHED or missing opportunity is indistinguishable. */
@@ -78,7 +86,14 @@ export class EmployerOpportunityService {
 
   /** API-BIZOPP-002. Own ORG, every lifecycle state. */
   async listOwn(employerId: string, filter: OwnOpportunityListFilter) {
-    return this.opportunitiesRepository.findOwnList(employerId, filter);
+    const opportunities = await this.opportunitiesRepository.findOwnList(employerId, filter);
+    return buildCursorPage(
+      opportunities,
+      filter.limit,
+      CAREER_CURSOR_KINDS.opportunityCreated,
+      (opportunity) => opportunity.createdAt,
+      (opportunity) => opportunity.id,
+    );
   }
 
   /**
@@ -131,7 +146,14 @@ export class EmployerOpportunityService {
 
   /** API-MOD-002. Every employer, every lifecycle state. */
   async listAdmin(filter: AdminOpportunityListFilter) {
-    return this.opportunitiesRepository.findAdminList(filter);
+    const opportunities = await this.opportunitiesRepository.findAdminList(filter);
+    return buildCursorPage(
+      opportunities,
+      filter.limit,
+      CAREER_CURSOR_KINDS.opportunityCreated,
+      (opportunity) => opportunity.createdAt,
+      (opportunity) => opportunity.id,
+    );
   }
 
   /** API-MOD-OPP-01. SUBMITTED -> UNDER_REVIEW. */

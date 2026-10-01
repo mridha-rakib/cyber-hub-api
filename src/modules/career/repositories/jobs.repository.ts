@@ -1,31 +1,33 @@
 import { Injectable } from "@nestjs/common";
-import { and, arrayContains, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, arrayContains, desc, eq, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 import { TransactionManager } from "../../../core/database/transaction.manager";
 import { jobs, type NewJob } from "../../../infrastructure/database/schema";
+import type { DecodedCareerCursor } from "../pagination/cursor-pagination";
 
 type JobStatusValue = NewJob["status"];
+type JobListingTypeValue = NewJob["listingType"];
 
 export interface PublicJobListFilter {
-  readonly type?: string;
+  readonly type?: JobListingTypeValue;
   readonly location?: string;
   readonly level?: string;
   readonly skill?: string;
   readonly remoteUk?: boolean;
-  readonly cursor?: string;
+  readonly cursor?: DecodedCareerCursor;
   readonly limit: number;
 }
 
 export interface OwnJobListFilter {
-  readonly status?: string;
-  readonly cursor?: string;
+  readonly status?: JobStatusValue;
+  readonly cursor?: DecodedCareerCursor;
   readonly limit: number;
 }
 
 export interface AdminJobListFilter {
-  readonly status?: string;
+  readonly status?: JobStatusValue;
   readonly employerId?: string;
-  readonly type?: string;
-  readonly cursor?: string;
+  readonly type?: JobListingTypeValue;
+  readonly cursor?: DecodedCareerCursor;
   readonly limit: number;
 }
 
@@ -44,50 +46,68 @@ export class JobsRepository {
 
   /** API-CAR-001. PUBLISHED only, never widened by caller-supplied status. */
   async findPublishedList(filter: PublicJobListFilter) {
-    const conditions = [eq(jobs.status, "PUBLISHED")];
-    if (filter.type) conditions.push(eq(jobs.listingType, filter.type as NewJob["listingType"]));
+    const conditions = [eq(jobs.status, "PUBLISHED"), isNotNull(jobs.publishedAt)];
+    if (filter.type) conditions.push(eq(jobs.listingType, filter.type));
     if (filter.location) conditions.push(eq(jobs.location, filter.location));
     if (filter.level) conditions.push(eq(jobs.level, filter.level));
     if (filter.skill) conditions.push(arrayContains(jobs.skills, [filter.skill]));
     if (filter.remoteUk !== undefined) conditions.push(eq(jobs.remoteUk, filter.remoteUk));
-    if (filter.cursor) conditions.push(sql`${jobs.id} > ${filter.cursor}`);
+    if (filter.cursor) {
+      const continuation = or(
+        lt(jobs.publishedAt, filter.cursor.sortValue),
+        and(eq(jobs.publishedAt, filter.cursor.sortValue), lt(jobs.id, filter.cursor.id)),
+      );
+      if (continuation) conditions.push(continuation);
+    }
 
     return this.db
       .select()
       .from(jobs)
       .where(and(...conditions))
-      .orderBy(desc(jobs.publishedAt))
-      .limit(filter.limit);
+      .orderBy(desc(jobs.publishedAt), desc(jobs.id))
+      .limit(filter.limit + 1);
   }
 
   /** API-BIZCAR-002. Every lifecycle state, scoped to one employer's own ORG. */
   async findOwnList(employerId: string, filter: OwnJobListFilter) {
     const conditions = [eq(jobs.employerId, employerId)];
-    if (filter.status) conditions.push(eq(jobs.status, filter.status as JobStatusValue));
-    if (filter.cursor) conditions.push(sql`${jobs.id} > ${filter.cursor}`);
+    if (filter.status) conditions.push(eq(jobs.status, filter.status));
+    if (filter.cursor) {
+      const continuation = or(
+        lt(jobs.createdAt, filter.cursor.sortValue),
+        and(eq(jobs.createdAt, filter.cursor.sortValue), lt(jobs.id, filter.cursor.id)),
+      );
+      if (continuation) conditions.push(continuation);
+    }
 
     return this.db
       .select()
       .from(jobs)
       .where(and(...conditions))
-      .orderBy(desc(jobs.createdAt))
-      .limit(filter.limit);
+      .orderBy(desc(jobs.createdAt), desc(jobs.id))
+      .limit(filter.limit + 1);
   }
 
   /** API-MOD-001. Every lifecycle state, every employer. */
   async findAdminList(filter: AdminJobListFilter) {
     const conditions = [];
-    if (filter.status) conditions.push(eq(jobs.status, filter.status as JobStatusValue));
+    if (filter.status) conditions.push(eq(jobs.status, filter.status));
     if (filter.employerId) conditions.push(eq(jobs.employerId, filter.employerId));
-    if (filter.type) conditions.push(eq(jobs.listingType, filter.type as NewJob["listingType"]));
-    if (filter.cursor) conditions.push(sql`${jobs.id} > ${filter.cursor}`);
+    if (filter.type) conditions.push(eq(jobs.listingType, filter.type));
+    if (filter.cursor) {
+      const continuation = or(
+        lt(jobs.createdAt, filter.cursor.sortValue),
+        and(eq(jobs.createdAt, filter.cursor.sortValue), lt(jobs.id, filter.cursor.id)),
+      );
+      if (continuation) conditions.push(continuation);
+    }
 
     return this.db
       .select()
       .from(jobs)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(jobs.createdAt))
-      .limit(filter.limit);
+      .orderBy(desc(jobs.createdAt), desc(jobs.id))
+      .limit(filter.limit + 1);
   }
 
   async create(input: NewJob) {

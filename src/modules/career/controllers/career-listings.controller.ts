@@ -23,26 +23,20 @@ import {
   businessCareerListingUpdateSchema,
 } from "../dto/business-career-listing.dto";
 import {
+  type AdminCareerListQuery,
+  adminCareerListQuerySchema,
+  type OwnCareerListQuery,
+  ownCareerListQuerySchema,
+  type PublicCareerListQuery,
+  publicCareerListQuerySchema,
+} from "../dto/list-query.dto";
+import {
   type ReasonTransitionInput,
   reasonTransitionSchema,
   type TransitionInput,
   transitionSchema,
 } from "../dto/transition.dto";
 import { CareerListingService } from "../services/career-listing.service";
-
-const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 100;
-
-function clampLimit(limit?: string): number {
-  const parsed = limit ? Number.parseInt(limit, 10) : DEFAULT_LIMIT;
-  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_LIMIT;
-  return Math.min(parsed, MAX_LIMIT);
-}
-
-function parseRemoteUk(value?: string): boolean | undefined {
-  if (value === undefined) return undefined;
-  return value === "true";
-}
 
 @Controller()
 export class CareerListingsController {
@@ -51,23 +45,9 @@ export class CareerListingsController {
   @Public()
   @Get("career-listings")
   listPublished(
-    @Query("type") type?: string,
-    @Query("location") location?: string,
-    @Query("level") level?: string,
-    @Query("skill") skill?: string,
-    @Query("remoteUk") remoteUk?: string,
-    @Query("cursor") cursor?: string,
-    @Query("limit") limit?: string,
+    @Query(new ValidationPipe(publicCareerListQuerySchema)) query: PublicCareerListQuery,
   ) {
-    return this.careerListingService.listPublished({
-      type,
-      location,
-      level,
-      skill,
-      remoteUk: parseRemoteUk(remoteUk),
-      cursor,
-      limit: clampLimit(limit),
-    });
+    return this.careerListingService.listPublished(query);
   }
 
   @Public()
@@ -99,15 +79,9 @@ export class CareerListingsController {
   @Get("business/career-listings")
   listOwn(
     @CurrentUser() principal: AuthPrincipal,
-    @Query("status") status?: string,
-    @Query("cursor") cursor?: string,
-    @Query("limit") limit?: string,
+    @Query(new ValidationPipe(ownCareerListQuerySchema)) query: OwnCareerListQuery,
   ) {
-    return this.careerListingService.listOwn(requireEmployerId(principal), {
-      status,
-      cursor,
-      limit: clampLimit(limit),
-    });
+    return this.careerListingService.listOwn(requireEmployerId(principal), query);
   }
 
   @AuthorizeOperation("API-BIZCAR-003")
@@ -148,20 +122,8 @@ export class CareerListingsController {
 
   @AuthorizeOperation("API-MOD-001")
   @Get("admin/career-listings")
-  listAdmin(
-    @Query("status") status?: string,
-    @Query("employerId") employerId?: string,
-    @Query("type") type?: string,
-    @Query("cursor") cursor?: string,
-    @Query("limit") limit?: string,
-  ) {
-    return this.careerListingService.listAdmin({
-      status,
-      employerId,
-      type,
-      cursor,
-      limit: clampLimit(limit),
-    });
+  listAdmin(@Query(new ValidationPipe(adminCareerListQuerySchema)) query: AdminCareerListQuery) {
+    return this.careerListingService.listAdmin(query);
   }
 
   @AuthorizeOperation("API-MOD-CAR-01")
