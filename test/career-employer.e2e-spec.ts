@@ -274,7 +274,7 @@ describe("Wave 3B Career + Employer Backend APIs", () => {
       const publicDetail = await request(app.getHttpServer())
         .get(`/api/v1/career-listings/${listingId}`)
         .expect(200);
-      expect(publicDetail.body.data.status).toBe("PUBLISHED");
+      expect(publicDetail.body.data.status).toBeUndefined();
       expect(publicDetail.body.data.moderationReason).toBeUndefined();
 
       const publicListPublished = await request(app.getHttpServer())

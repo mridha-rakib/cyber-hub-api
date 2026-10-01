@@ -7,6 +7,7 @@ import type {
   BusinessCareerListingInput,
   BusinessCareerListingUpdateInput,
 } from "../dto/business-career-listing.dto";
+import { buildCursorPage, CAREER_CURSOR_KINDS } from "../pagination/cursor-pagination";
 import {
   type AdminJobListFilter,
   JobsRepository,
@@ -15,14 +16,9 @@ import {
 } from "../repositories/jobs.repository";
 
 /**
- * §30 data minimization: the public surface (API-CAR-001/002) never
- * exposes `employerId`/`submittedByUserId` (internal ownership FKs),
- * `moderationReason` (INTERNAL per ERD §7.9), or `stateVersion` (a
- * concurrency-control implementation detail, not documented as part of
- * any public response). No response DTO is defined in API Contract v1.1
- * for these routes, so this is the minimal, source-grounded field set —
- * everything else the ERD marks [SRC] plus the workflow-visible
- * `status`/`publishedAt`.
+ * API Contract v1.1 `CareerListingPublicView`: exact public projection for
+ * API-CAR-001/002. The raw application target remains available only to
+ * API-CAR-003 after its PUBLISHED-state check.
  */
 function toPublicView(job: Job) {
   return {
@@ -32,13 +28,9 @@ function toPublicView(job: Job) {
     location: job.location,
     level: job.level,
     skills: job.skills,
-    applicationUrl: job.applicationUrl,
     listingType: job.listingType,
     remoteUk: job.remoteUk,
-    status: job.status,
     publishedAt: job.publishedAt,
-    createdAt: job.createdAt,
-    updatedAt: job.updatedAt,
   };
 }
 
@@ -52,7 +44,14 @@ export class CareerListingService {
   /** API-CAR-001. Public, PUBLISHED-only — never widened by any caller input. */
   async listPublished(filter: PublicJobListFilter) {
     const jobs = await this.jobsRepository.findPublishedList(filter);
-    return jobs.map(toPublicView);
+    const page = buildCursorPage(
+      jobs,
+      filter.limit,
+      CAREER_CURSOR_KINDS.jobPublished,
+      (job) => job.publishedAt,
+      (job) => job.id,
+    );
+    return { data: page.data.map(toPublicView), meta: page.meta };
   }
 
   /** API-CAR-002. Public — a non-PUBLISHED or missing listing is indistinguishable. */
@@ -105,7 +104,14 @@ export class CareerListingService {
 
   /** API-BIZCAR-002. Own ORG, every lifecycle state. */
   async listOwn(employerId: string, filter: OwnJobListFilter) {
-    return this.jobsRepository.findOwnList(employerId, filter);
+    const jobs = await this.jobsRepository.findOwnList(employerId, filter);
+    return buildCursorPage(
+      jobs,
+      filter.limit,
+      CAREER_CURSOR_KINDS.jobCreated,
+      (job) => job.createdAt,
+      (job) => job.id,
+    );
   }
 
   /**
@@ -157,7 +163,14 @@ export class CareerListingService {
 
   /** API-MOD-001. Every employer, every lifecycle state. */
   async listAdmin(filter: AdminJobListFilter) {
-    return this.jobsRepository.findAdminList(filter);
+    const jobs = await this.jobsRepository.findAdminList(filter);
+    return buildCursorPage(
+      jobs,
+      filter.limit,
+      CAREER_CURSOR_KINDS.jobCreated,
+      (job) => job.createdAt,
+      (job) => job.id,
+    );
   }
 
   /** API-MOD-CAR-01. SUBMITTED -> UNDER_REVIEW. */

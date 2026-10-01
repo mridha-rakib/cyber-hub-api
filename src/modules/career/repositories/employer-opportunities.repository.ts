@@ -1,32 +1,34 @@
 import { Injectable } from "@nestjs/common";
-import { and, arrayContains, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, arrayContains, desc, eq, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 import { TransactionManager } from "../../../core/database/transaction.manager";
 import {
   employerOpportunities,
   type NewEmployerOpportunity,
 } from "../../../infrastructure/database/schema";
+import type { DecodedCareerCursor } from "../pagination/cursor-pagination";
 
 type OpportunityStatusValue = NewEmployerOpportunity["status"];
+type OpportunityTypeValue = NewEmployerOpportunity["type"];
 
 export interface PublicOpportunityListFilter {
-  readonly type?: string;
+  readonly type?: OpportunityTypeValue;
   readonly skill?: string;
-  readonly cursor?: string;
+  readonly cursor?: DecodedCareerCursor;
   readonly limit: number;
 }
 
 export interface OwnOpportunityListFilter {
-  readonly type?: string;
-  readonly status?: string;
-  readonly cursor?: string;
+  readonly type?: OpportunityTypeValue;
+  readonly status?: OpportunityStatusValue;
+  readonly cursor?: DecodedCareerCursor;
   readonly limit: number;
 }
 
 export interface AdminOpportunityListFilter {
-  readonly status?: string;
+  readonly status?: OpportunityStatusValue;
   readonly employerId?: string;
-  readonly type?: string;
-  readonly cursor?: string;
+  readonly type?: OpportunityTypeValue;
+  readonly cursor?: DecodedCareerCursor;
   readonly limit: number;
 }
 
@@ -49,59 +51,78 @@ export class EmployerOpportunitiesRepository {
 
   /** API-EMP-001. PUBLISHED only, never widened by caller-supplied status. */
   async findPublishedList(filter: PublicOpportunityListFilter) {
-    const conditions = [eq(employerOpportunities.status, "PUBLISHED")];
-    if (filter.type)
-      conditions.push(
-        eq(employerOpportunities.type, filter.type as NewEmployerOpportunity["type"]),
-      );
+    const conditions = [
+      eq(employerOpportunities.status, "PUBLISHED"),
+      isNotNull(employerOpportunities.publishedAt),
+    ];
+    if (filter.type) conditions.push(eq(employerOpportunities.type, filter.type));
     if (filter.skill) conditions.push(arrayContains(employerOpportunities.skills, [filter.skill]));
-    if (filter.cursor) conditions.push(sql`${employerOpportunities.id} > ${filter.cursor}`);
+    if (filter.cursor) {
+      const continuation = or(
+        lt(employerOpportunities.publishedAt, filter.cursor.sortValue),
+        and(
+          eq(employerOpportunities.publishedAt, filter.cursor.sortValue),
+          lt(employerOpportunities.id, filter.cursor.id),
+        ),
+      );
+      if (continuation) conditions.push(continuation);
+    }
 
     return this.db
       .select()
       .from(employerOpportunities)
       .where(and(...conditions))
-      .orderBy(desc(employerOpportunities.publishedAt))
-      .limit(filter.limit);
+      .orderBy(desc(employerOpportunities.publishedAt), desc(employerOpportunities.id))
+      .limit(filter.limit + 1);
   }
 
   /** API-BIZOPP-002. Every lifecycle state, scoped to one employer's own ORG. */
   async findOwnList(employerId: string, filter: OwnOpportunityListFilter) {
     const conditions = [eq(employerOpportunities.employerId, employerId)];
-    if (filter.type)
-      conditions.push(
-        eq(employerOpportunities.type, filter.type as NewEmployerOpportunity["type"]),
+    if (filter.type) conditions.push(eq(employerOpportunities.type, filter.type));
+    if (filter.status) conditions.push(eq(employerOpportunities.status, filter.status));
+    if (filter.cursor) {
+      const continuation = or(
+        lt(employerOpportunities.createdAt, filter.cursor.sortValue),
+        and(
+          eq(employerOpportunities.createdAt, filter.cursor.sortValue),
+          lt(employerOpportunities.id, filter.cursor.id),
+        ),
       );
-    if (filter.status)
-      conditions.push(eq(employerOpportunities.status, filter.status as OpportunityStatusValue));
-    if (filter.cursor) conditions.push(sql`${employerOpportunities.id} > ${filter.cursor}`);
+      if (continuation) conditions.push(continuation);
+    }
 
     return this.db
       .select()
       .from(employerOpportunities)
       .where(and(...conditions))
-      .orderBy(desc(employerOpportunities.createdAt))
-      .limit(filter.limit);
+      .orderBy(desc(employerOpportunities.createdAt), desc(employerOpportunities.id))
+      .limit(filter.limit + 1);
   }
 
   /** API-MOD-002. Every lifecycle state, every employer. */
   async findAdminList(filter: AdminOpportunityListFilter) {
     const conditions = [];
-    if (filter.status)
-      conditions.push(eq(employerOpportunities.status, filter.status as OpportunityStatusValue));
+    if (filter.status) conditions.push(eq(employerOpportunities.status, filter.status));
     if (filter.employerId) conditions.push(eq(employerOpportunities.employerId, filter.employerId));
-    if (filter.type)
-      conditions.push(
-        eq(employerOpportunities.type, filter.type as NewEmployerOpportunity["type"]),
+    if (filter.type) conditions.push(eq(employerOpportunities.type, filter.type));
+    if (filter.cursor) {
+      const continuation = or(
+        lt(employerOpportunities.createdAt, filter.cursor.sortValue),
+        and(
+          eq(employerOpportunities.createdAt, filter.cursor.sortValue),
+          lt(employerOpportunities.id, filter.cursor.id),
+        ),
       );
-    if (filter.cursor) conditions.push(sql`${employerOpportunities.id} > ${filter.cursor}`);
+      if (continuation) conditions.push(continuation);
+    }
 
     return this.db
       .select()
       .from(employerOpportunities)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(employerOpportunities.createdAt))
-      .limit(filter.limit);
+      .orderBy(desc(employerOpportunities.createdAt), desc(employerOpportunities.id))
+      .limit(filter.limit + 1);
   }
 
   async create(input: NewEmployerOpportunity) {
