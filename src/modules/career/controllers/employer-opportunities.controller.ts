@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from "@nestjs/common";
 import { CurrentUser } from "../../../common/decorators/current-user.decorator";
 import { Public } from "../../../common/decorators/public.decorator";
+import { ValidateUuidRouteParams } from "../../../common/decorators/validate-uuid-route-params.decorator";
 import { AuthorizeOperation } from "../../../core/security/authorization/authorize-operation.decorator";
 import { ValidationPipe } from "../../../core/validation/validation.pipe";
 import type { AuthPrincipal } from "../../auth/services/session-authentication.types";
@@ -41,6 +42,7 @@ export class EmployerOpportunitiesController {
   }
 
   @Public()
+  @ValidateUuidRouteParams("opportunityId")
   @Get("opportunities/:opportunityId")
   getPublished(@Param("opportunityId") opportunityId: string) {
     return this.opportunityService.getPublished(opportunityId);
@@ -66,12 +68,14 @@ export class EmployerOpportunitiesController {
   }
 
   @AuthorizeOperation("API-BIZOPP-003")
+  @ValidateUuidRouteParams("opportunityId")
   @Get("business/opportunities/:opportunityId")
   getOwn(@Param("opportunityId") opportunityId: string) {
     return this.opportunityService.getOwn(opportunityId);
   }
 
   @AuthorizeOperation("API-BIZOPP-004")
+  @ValidateUuidRouteParams("opportunityId")
   @Patch("business/opportunities/:opportunityId")
   update(
     @Param("opportunityId") opportunityId: string,
@@ -81,6 +85,7 @@ export class EmployerOpportunitiesController {
   }
 
   @AuthorizeOperation("API-BIZOPP-005")
+  @ValidateUuidRouteParams("opportunityId")
   @HttpCode(200)
   @Post("business/opportunities/:opportunityId/resubmit")
   resubmit(
@@ -91,6 +96,7 @@ export class EmployerOpportunitiesController {
   }
 
   @AuthorizeOperation("API-BIZOPP-006")
+  @ValidateUuidRouteParams("opportunityId")
   @HttpCode(200)
   @Post("business/opportunities/:opportunityId/close")
   close(
@@ -109,6 +115,7 @@ export class EmployerOpportunitiesController {
   }
 
   @AuthorizeOperation("API-MOD-OPP-01")
+  @ValidateUuidRouteParams("id")
   @HttpCode(200)
   @Post("admin/opportunities/:id/start-review")
   startReview(
@@ -119,6 +126,7 @@ export class EmployerOpportunitiesController {
   }
 
   @AuthorizeOperation("API-MOD-OPP-02")
+  @ValidateUuidRouteParams("id")
   @HttpCode(200)
   @Post("admin/opportunities/:id/publish")
   publish(
@@ -129,6 +137,7 @@ export class EmployerOpportunitiesController {
   }
 
   @AuthorizeOperation("API-MOD-OPP-03")
+  @ValidateUuidRouteParams("id")
   @HttpCode(200)
   @Post("admin/opportunities/:id/reject")
   reject(
@@ -139,6 +148,7 @@ export class EmployerOpportunitiesController {
   }
 
   @AuthorizeOperation("API-MOD-OPP-04")
+  @ValidateUuidRouteParams("id")
   @HttpCode(200)
   @Post("admin/opportunities/:id/close")
   adminClose(

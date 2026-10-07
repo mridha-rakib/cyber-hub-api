@@ -206,6 +206,177 @@ describe("Wave 3B Career + Employer Backend APIs", () => {
     ...overrides,
   });
 
+  describe("Wave 3 UUID route-parameter boundary", () => {
+    let business: Awaited<ReturnType<typeof registerBusiness>>;
+    let admin: Awaited<ReturnType<typeof registerAdmin>>;
+
+    beforeAll(async () => {
+      business = await registerBusiness("uuid-boundary-biz");
+      admin = await registerAdmin("uuid-boundary-admin");
+    });
+
+    const transitionBody = { expectedStateVersion: 1 };
+    const rejectBody = { expectedStateVersion: 1, reason: "Validation boundary test" };
+    const cases: Array<{
+      apiId: string;
+      method: "get" | "patch" | "post";
+      path: string;
+      actor?: "business" | "admin";
+      body?: Record<string, unknown>;
+    }> = [
+      { apiId: "API-CAR-002", method: "get", path: "/api/v1/career-listings/not-a-uuid" },
+      {
+        apiId: "API-CAR-003",
+        method: "get",
+        path: "/api/v1/career-listings/not-a-uuid/outbound",
+      },
+      {
+        apiId: "API-BIZCAR-003",
+        method: "get",
+        path: "/api/v1/business/career-listings/not-a-uuid",
+        actor: "business",
+      },
+      {
+        apiId: "API-BIZCAR-004",
+        method: "patch",
+        path: "/api/v1/business/career-listings/not-a-uuid",
+        actor: "business",
+        body: transitionBody,
+      },
+      {
+        apiId: "API-BIZCAR-005",
+        method: "post",
+        path: "/api/v1/business/career-listings/not-a-uuid/resubmit",
+        actor: "business",
+        body: transitionBody,
+      },
+      {
+        apiId: "API-BIZCAR-006",
+        method: "post",
+        path: "/api/v1/business/career-listings/not-a-uuid/close",
+        actor: "business",
+        body: transitionBody,
+      },
+      {
+        apiId: "API-MOD-CAR-01",
+        method: "post",
+        path: "/api/v1/admin/career-listings/not-a-uuid/start-review",
+        actor: "admin",
+        body: transitionBody,
+      },
+      {
+        apiId: "API-MOD-CAR-02",
+        method: "post",
+        path: "/api/v1/admin/career-listings/not-a-uuid/publish",
+        actor: "admin",
+        body: transitionBody,
+      },
+      {
+        apiId: "API-MOD-CAR-03",
+        method: "post",
+        path: "/api/v1/admin/career-listings/not-a-uuid/reject",
+        actor: "admin",
+        body: rejectBody,
+      },
+      {
+        apiId: "API-MOD-CAR-04",
+        method: "post",
+        path: "/api/v1/admin/career-listings/not-a-uuid/close",
+        actor: "admin",
+        body: transitionBody,
+      },
+      { apiId: "API-EMP-002", method: "get", path: "/api/v1/opportunities/not-a-uuid" },
+      {
+        apiId: "API-BIZOPP-003",
+        method: "get",
+        path: "/api/v1/business/opportunities/not-a-uuid",
+        actor: "business",
+      },
+      {
+        apiId: "API-BIZOPP-004",
+        method: "patch",
+        path: "/api/v1/business/opportunities/not-a-uuid",
+        actor: "business",
+        body: transitionBody,
+      },
+      {
+        apiId: "API-BIZOPP-005",
+        method: "post",
+        path: "/api/v1/business/opportunities/not-a-uuid/resubmit",
+        actor: "business",
+        body: transitionBody,
+      },
+      {
+        apiId: "API-BIZOPP-006",
+        method: "post",
+        path: "/api/v1/business/opportunities/not-a-uuid/close",
+        actor: "business",
+        body: transitionBody,
+      },
+      {
+        apiId: "API-MOD-OPP-01",
+        method: "post",
+        path: "/api/v1/admin/opportunities/not-a-uuid/start-review",
+        actor: "admin",
+        body: transitionBody,
+      },
+      {
+        apiId: "API-MOD-OPP-02",
+        method: "post",
+        path: "/api/v1/admin/opportunities/not-a-uuid/publish",
+        actor: "admin",
+        body: transitionBody,
+      },
+      {
+        apiId: "API-MOD-OPP-03",
+        method: "post",
+        path: "/api/v1/admin/opportunities/not-a-uuid/reject",
+        actor: "admin",
+        body: rejectBody,
+      },
+      {
+        apiId: "API-MOD-OPP-04",
+        method: "post",
+        path: "/api/v1/admin/opportunities/not-a-uuid/close",
+        actor: "admin",
+        body: transitionBody,
+      },
+    ];
+
+    it.each(cases)("rejects malformed UUID before DB access for $apiId", async (testCase) => {
+      let httpRequest = request(app.getHttpServer())[testCase.method](testCase.path);
+      if (testCase.actor) {
+        httpRequest = auth(httpRequest, testCase.actor === "business" ? business : admin);
+      }
+      if (testCase.body) httpRequest = httpRequest.send(testCase.body);
+
+      const response = await httpRequest.expect(422);
+      expect(response.body.error).toMatchObject({
+        code: "VALIDATION_ERROR",
+        message: "Validation failed",
+      });
+      expect(JSON.stringify(response.body)).not.toMatch(
+        /postgres|uuid type|drizzle|driver|query:|stack|database_url|node_modules/i,
+      );
+    });
+
+    it.each(["123", "abc", "0000", "00000000-0000-0000-0000-00000000000g"])(
+      "rejects representative malformed UUID value %s",
+      async (invalidId) => {
+        const response = await request(app.getHttpServer())
+          .get(`/api/v1/career-listings/${invalidId}`)
+          .expect(422);
+        expect(response.body.error.code).toBe("VALIDATION_ERROR");
+      },
+    );
+
+    it("preserves authentication precedence for protected malformed-ID routes", async () => {
+      await request(app.getHttpServer())
+        .get("/api/v1/business/career-listings/not-a-uuid")
+        .expect(401);
+    });
+  });
+
   describe("Career listings (jobs)", () => {
     it("runs the full business -> admin moderation lifecycle with server-derived ownership", async () => {
       const admin = await registerAdmin("car-admin");

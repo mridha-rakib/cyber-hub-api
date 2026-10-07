@@ -12,6 +12,7 @@ import {
 import { CurrentUser } from "../../../common/decorators/current-user.decorator";
 import { Public } from "../../../common/decorators/public.decorator";
 import { RawResponse } from "../../../common/decorators/raw-response.decorator";
+import { ValidateUuidRouteParams } from "../../../common/decorators/validate-uuid-route-params.decorator";
 import { AuthorizeOperation } from "../../../core/security/authorization/authorize-operation.decorator";
 import { ValidationPipe } from "../../../core/validation/validation.pipe";
 import type { AuthPrincipal } from "../../auth/services/session-authentication.types";
@@ -51,6 +52,7 @@ export class CareerListingsController {
   }
 
   @Public()
+  @ValidateUuidRouteParams("listingId")
   @Get("career-listings/:listingId")
   getPublished(@Param("listingId") listingId: string) {
     return this.careerListingService.getPublished(listingId);
@@ -59,6 +61,7 @@ export class CareerListingsController {
   @Public()
   @RawResponse()
   @Redirect()
+  @ValidateUuidRouteParams("listingId")
   @Get("career-listings/:listingId/outbound")
   async getOutbound(@Param("listingId") listingId: string) {
     const url = await this.careerListingService.getOutboundUrl(listingId);
@@ -85,12 +88,14 @@ export class CareerListingsController {
   }
 
   @AuthorizeOperation("API-BIZCAR-003")
+  @ValidateUuidRouteParams("listingId")
   @Get("business/career-listings/:listingId")
   getOwn(@Param("listingId") listingId: string) {
     return this.careerListingService.getOwn(listingId);
   }
 
   @AuthorizeOperation("API-BIZCAR-004")
+  @ValidateUuidRouteParams("listingId")
   @Patch("business/career-listings/:listingId")
   update(
     @Param("listingId") listingId: string,
@@ -101,6 +106,7 @@ export class CareerListingsController {
   }
 
   @AuthorizeOperation("API-BIZCAR-005")
+  @ValidateUuidRouteParams("listingId")
   @HttpCode(200)
   @Post("business/career-listings/:listingId/resubmit")
   resubmit(
@@ -111,6 +117,7 @@ export class CareerListingsController {
   }
 
   @AuthorizeOperation("API-BIZCAR-006")
+  @ValidateUuidRouteParams("listingId")
   @HttpCode(200)
   @Post("business/career-listings/:listingId/close")
   close(
@@ -127,6 +134,7 @@ export class CareerListingsController {
   }
 
   @AuthorizeOperation("API-MOD-CAR-01")
+  @ValidateUuidRouteParams("id")
   @HttpCode(200)
   @Post("admin/career-listings/:id/start-review")
   startReview(
@@ -137,6 +145,7 @@ export class CareerListingsController {
   }
 
   @AuthorizeOperation("API-MOD-CAR-02")
+  @ValidateUuidRouteParams("id")
   @HttpCode(200)
   @Post("admin/career-listings/:id/publish")
   publish(
@@ -147,6 +156,7 @@ export class CareerListingsController {
   }
 
   @AuthorizeOperation("API-MOD-CAR-03")
+  @ValidateUuidRouteParams("id")
   @HttpCode(200)
   @Post("admin/career-listings/:id/reject")
   reject(
@@ -157,6 +167,7 @@ export class CareerListingsController {
   }
 
   @AuthorizeOperation("API-MOD-CAR-04")
+  @ValidateUuidRouteParams("id")
   @HttpCode(200)
   @Post("admin/career-listings/:id/close")
   adminClose(

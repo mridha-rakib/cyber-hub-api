@@ -12,6 +12,7 @@ import { InternshipResourceResolver } from "../../modules/internship/resolvers/i
 import { SubmissionResourceResolver } from "../../modules/internship/resolvers/submission-resource.resolver";
 import { PortfolioModule } from "../../modules/portfolio/portfolio.module";
 import { PortfolioResourceResolver } from "../../modules/portfolio/resolvers/portfolio-resource.resolver";
+import { UuidRouteParamGuard } from "../validation/uuid-route-param.guard";
 import { AuthScopeEvaluator } from "./authorization/auth-scope-evaluator.service";
 import { AuthorizationAuditService } from "./authorization/authorization-audit.service";
 import { CLOCK, SystemClock } from "./authorization/clock";
@@ -28,16 +29,18 @@ import { PermissionGuard } from "./guards/permission.guard";
 /**
  * Central authorization/security wiring for the whole application.
  *
- * Registers AuthGuard and PermissionGuard as global `APP_GUARD` providers,
+ * Registers the security boundary guards as global `APP_GUARD` providers,
  * in this exact array order, so every route is protected by default:
  *
  *   1. AuthGuard       — establishes `request.principal` from the DB-backed
  *                         session, or allows straight through for
  *                         `@Public()` routes. Throws 401 otherwise.
- *   2. PermissionGuard — deny-by-default RBAC enforcement consuming the
+ *   2. UuidRouteParamGuard — rejects explicitly marked malformed resource
+ *                         identifiers before resource resolution can query DB.
+ *   3. PermissionGuard — deny-by-default RBAC enforcement consuming the
  *                         principal AuthGuard set. See permission.guard.ts.
  *
- * Declaring both APP_GUARD entries in the same providers array (rather than
+ * Declaring all three APP_GUARD entries in the same providers array (rather than
  * splitting them across modules) is deliberate: NestJS preserves provider
  * declaration order within one array for multi-providers, which is the only
  * ordering guarantee this Wave depends on — PermissionGuard must never run
@@ -55,6 +58,7 @@ import { PermissionGuard } from "./guards/permission.guard";
   imports: [AuthModule, InternshipModule, CertificateModule, PortfolioModule, CareerModule],
   providers: [
     { provide: APP_GUARD, useClass: AuthGuard },
+    { provide: APP_GUARD, useClass: UuidRouteParamGuard },
     { provide: APP_GUARD, useClass: PermissionGuard },
     // Factory provider: ConditionRegistry's constructor takes a plain
     // array, which Nest cannot resolve via implicit constructor-injection
