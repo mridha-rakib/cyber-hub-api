@@ -6,6 +6,8 @@ import { CareerResourceResolver } from "../../modules/career/resolvers/career-re
 import { EmployerOpportunityResourceResolver } from "../../modules/career/resolvers/employer-opportunity-resource.resolver";
 import { CertificateModule } from "../../modules/certificate/certificate.module";
 import { CertificateResourceResolver } from "../../modules/certificate/resolvers/certificate-resource.resolver";
+import { ConsultingModule } from "../../modules/consulting/consulting.module";
+import { ConsultingResourceResolver } from "../../modules/consulting/resolvers/consulting-resource.resolver";
 import { InternshipModule } from "../../modules/internship/internship.module";
 import { CompletionResourceResolver } from "../../modules/internship/resolvers/completion-resource.resolver";
 import { InternshipResourceResolver } from "../../modules/internship/resolvers/internship-resource.resolver";
@@ -55,7 +57,14 @@ import { PermissionGuard } from "./guards/permission.guard";
  * route — see permission.guard.ts for what happens when neither is present.
  */
 @Module({
-  imports: [AuthModule, InternshipModule, CertificateModule, PortfolioModule, CareerModule],
+  imports: [
+    AuthModule,
+    InternshipModule,
+    CertificateModule,
+    PortfolioModule,
+    CareerModule,
+    ConsultingModule,
+  ],
   providers: [
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: UuidRouteParamGuard },
@@ -85,6 +94,7 @@ import { PermissionGuard } from "./guards/permission.guard";
         portfolio: PortfolioResourceResolver,
         career: CareerResourceResolver,
         employerOpportunity: EmployerOpportunityResourceResolver,
+        consulting: ConsultingResourceResolver,
       ) => [
         internship,
         submission,
@@ -93,6 +103,7 @@ import { PermissionGuard } from "./guards/permission.guard";
         portfolio,
         career,
         employerOpportunity,
+        consulting,
       ],
       inject: [
         InternshipResourceResolver,
@@ -102,6 +113,7 @@ import { PermissionGuard } from "./guards/permission.guard";
         PortfolioResourceResolver,
         CareerResourceResolver,
         EmployerOpportunityResourceResolver,
+        ConsultingResourceResolver,
       ],
     },
     ResourceContextResolverRegistry,

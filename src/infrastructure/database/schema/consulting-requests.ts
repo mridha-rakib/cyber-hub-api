@@ -51,7 +51,7 @@ export const consultingRequests = pgTable(
     index("consulting_requests_employer_status_submitted_idx").on(
       table.employerId,
       table.status,
-      table.submittedAt,
+      table.submittedAt.desc(),
     ),
     index("consulting_requests_assigned_consultant_status_idx").on(
       table.assignedConsultantId,

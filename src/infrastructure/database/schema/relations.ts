@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import { auditLogs } from "./audit-logs";
 import { authTokens } from "./auth-tokens";
 import { certificates } from "./certificates";
+import { consultingNotes } from "./consulting-notes";
 import { consultingRequests } from "./consulting-requests";
 import { employerOpportunities } from "./employer-opportunities";
 import { employers } from "./employers";
@@ -51,6 +52,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   assignedConsultingRequests: many(consultingRequests, {
     relationName: "consultingRequestAssignedConsultant",
   }),
+  authoredConsultingNotes: many(consultingNotes),
   confirmedScopeAuthorizations: many(securityScopeAuthorizations),
   assignedSecurityAssessments: many(securityAssessments),
   submittedCareerListings: many(jobs),
@@ -73,7 +75,19 @@ export const consultingRequestsRelations = relations(consultingRequests, ({ one,
     relationName: "consultingRequestAssignedConsultant",
   }),
   scopeAuthorizations: many(securityScopeAuthorizations),
+  notes: many(consultingNotes),
   assessments: many(securityAssessments),
+}));
+
+export const consultingNotesRelations = relations(consultingNotes, ({ one }) => ({
+  consultingRequest: one(consultingRequests, {
+    fields: [consultingNotes.consultingRequestId],
+    references: [consultingRequests.id],
+  }),
+  author: one(users, {
+    fields: [consultingNotes.authorUserId],
+    references: [users.id],
+  }),
 }));
 
 export const securityScopeAuthorizationsRelations = relations(

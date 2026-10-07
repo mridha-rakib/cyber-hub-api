@@ -75,6 +75,8 @@ export const securityScopeAuthorizations = pgTable(
       table.isCurrent,
     ),
     index("security_scope_authorizations_consulting_request_id_idx").on(table.consultingRequestId),
+    index("security_scope_authorizations_confirmed_at_idx").on(table.confirmedAt),
+    index("security_scope_authorizations_is_current_idx").on(table.isCurrent),
     check("security_scope_authorizations_version_no_check", sql`${table.versionNo} >= 1`),
   ],
 );

@@ -2,6 +2,7 @@ export * from "./audit-logs";
 export * from "./auth-tokens";
 export * from "./certificates";
 export * from "./common";
+export * from "./consulting-notes";
 export * from "./consulting-requests";
 export * from "./employer-opportunities";
 export * from "./employers";

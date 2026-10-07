@@ -1,0 +1,235 @@
+/**
+ * Source-aligned Wave 4A matrix for API-CON-001..015. This is an internal
+ * contract only: Wave 4A intentionally exposes no controller or route.
+ */
+export interface ConsultingApiContractEntry {
+  readonly apiId: `API-CON-${string}`;
+  readonly method: "GET" | "POST";
+  readonly path: string;
+  readonly roles: readonly string[];
+  readonly permission: string;
+  readonly scope: readonly string[];
+  readonly requestContract: string;
+  readonly responseProjection: string;
+  readonly workflow: string | null;
+  readonly cas: boolean;
+  readonly auditRequired: boolean;
+  readonly tables: readonly string[];
+  readonly futureUi: readonly string[];
+  readonly release: string;
+  readonly status: "PERSISTENCE_FOUNDATION_ONLY";
+}
+
+const foundation = "PERSISTENCE_FOUNDATION_ONLY" as const;
+
+export const CONSULTING_API_CONTRACT: readonly ConsultingApiContractEntry[] = [
+  {
+    apiId: "API-CON-001",
+    method: "POST",
+    path: "/business/consulting-requests",
+    roles: ["ROLE_BUSINESS"],
+    permission: "consulting.request.create_own",
+    scope: ["ORG"],
+    requestContract: "ConsultingRequestInput",
+    responseProjection: "ConsultingClientView",
+    workflow: "WF-REQ-01 (new -> SUBMITTED)",
+    cas: false,
+    auditRequired: true,
+    tables: ["consulting_requests", "audit_logs"],
+    futureUi: ["UI-BIZ-009"],
+    release: "MVP v2",
+    status: foundation,
+  },
+  {
+    apiId: "API-CON-002",
+    method: "GET",
+    path: "/business/consulting-requests",
+    roles: ["ROLE_BUSINESS"],
+    permission: "consulting.request.read_own",
+    scope: ["ORG"],
+    requestContract: "Query: status?, cursor?, limit?",
+    responseProjection: "ConsultingClientView[] (paginated)",
+    workflow: null,
+    cas: false,
+    auditRequired: false,
+    tables: ["consulting_requests"],
+    futureUi: ["UI-BIZ-001", "UI-BIZ-008"],
+    release: "MVP v2",
+    status: foundation,
+  },
+  {
+    apiId: "API-CON-003",
+    method: "GET",
+    path: "/business/consulting-requests/{requestId}",
+    roles: ["ROLE_BUSINESS"],
+    permission: "consulting.request.read_own",
+    scope: ["ORG"],
+    requestContract: "None",
+    responseProjection: "ConsultingClientView (never internal notes)",
+    workflow: null,
+    cas: false,
+    auditRequired: false,
+    tables: ["consulting_requests"],
+    futureUi: ["UI-BIZ-010"],
+    release: "MVP v2",
+    status: foundation,
+  },
+  {
+    apiId: "API-CON-004",
+    method: "POST",
+    path: "/business/consulting-requests/{requestId}/scope-authorizations",
+    roles: ["ROLE_BUSINESS"],
+    permission: "consulting.scope.confirm_own",
+    scope: ["ORG"],
+    requestContract: "ScopeAuthorizationInput",
+    responseProjection: "Current scope authorization version",
+    workflow: null,
+    cas: false,
+    auditRequired: true,
+    tables: ["security_scope_authorizations", "consulting_requests", "audit_logs"],
+    futureUi: ["UI-BIZ-010"],
+    release: "MVP / Compliance",
+    status: foundation,
+  },
+  {
+    apiId: "API-CON-005",
+    method: "GET",
+    path: "/business/consulting-requests/{requestId}/scope-authorizations/current",
+    roles: ["ROLE_BUSINESS"],
+    permission: "consulting.scope.confirm_own",
+    scope: ["ORG"],
+    requestContract: "None",
+    responseProjection: "Own current explicit scope authorization",
+    workflow: null,
+    cas: false,
+    auditRequired: false,
+    tables: ["security_scope_authorizations"],
+    futureUi: ["UI-BIZ-010"],
+    release: "MVP / Compliance",
+    status: foundation,
+  },
+  {
+    apiId: "API-CON-006",
+    method: "GET",
+    path: "/consulting/requests",
+    roles: ["ROLE_CONSULTANT", "ROLE_ADMIN"],
+    permission: "consulting.request.review_assigned",
+    scope: ["ASG", "Admin"],
+    requestContract: "Query: status?, employerId? (Admin only), cursor?, limit?",
+    responseProjection: "Role-scoped operational request summary[]",
+    workflow: null,
+    cas: false,
+    auditRequired: false,
+    tables: ["consulting_requests", "employers"],
+    futureUi: ["UI-CON-001", "UI-CON-002", "UI-ADM-001", "UI-ADM-019"],
+    release: "MVP v2",
+    status: foundation,
+  },
+  {
+    apiId: "API-CON-007",
+    method: "GET",
+    path: "/consulting/requests/{requestId}",
+    roles: ["ROLE_CONSULTANT", "ROLE_ADMIN"],
+    permission: "consulting.request.review_assigned",
+    scope: ["ASG", "Admin"],
+    requestContract: "None",
+    responseProjection: "Operational request + authorised scope summary; notes separate",
+    workflow: null,
+    cas: false,
+    auditRequired: false,
+    tables: ["consulting_requests", "security_scope_authorizations"],
+    futureUi: ["UI-CON-003", "UI-ADM-020"],
+    release: "MVP v2",
+    status: foundation,
+  },
+  {
+    apiId: "API-CON-008",
+    method: "POST",
+    path: "/admin/consulting-requests/{requestId}/assign-consultant",
+    roles: ["ROLE_ADMIN"],
+    permission: "consulting.request.review_assigned",
+    scope: ["Admin"],
+    requestContract: "ConsultantAssignmentInput",
+    responseProjection: "Operational consulting request",
+    workflow: null,
+    cas: false,
+    auditRequired: true,
+    tables: ["consulting_requests", "audit_logs"],
+    futureUi: ["UI-ADM-020"],
+    release: "MVP v2",
+    status: foundation,
+  },
+  ...[
+    ["009", "start-review", "TransitionInput", "WF-REQ-02 (SUBMITTED -> UNDER_REVIEW)"],
+    ["010", "accept", "TransitionInput", "WF-REQ-03 (UNDER_REVIEW -> ACCEPTED)"],
+    ["011", "decline", "ReasonTransitionInput", "WF-REQ-04 (UNDER_REVIEW -> DECLINED)"],
+    ["012", "start-delivery", "TransitionInput", "WF-REQ-05 (ACCEPTED -> IN_PROGRESS)"],
+    ["013", "complete", "TransitionInput", "WF-REQ-06 (IN_PROGRESS -> COMPLETED)"],
+  ].map(([suffix, command, requestContract, workflow]) => ({
+    apiId: `API-CON-${suffix}` as `API-CON-${string}`,
+    method: "POST" as const,
+    path: `/consulting/requests/{requestId}/${command}`,
+    roles: ["ROLE_CONSULTANT", "ROLE_ADMIN"],
+    permission: "consulting.request.review_assigned",
+    scope: suffix === "012" ? ["ASG", "Admin", "AUTH_SCOPE if technical"] : ["ASG", "Admin"],
+    requestContract,
+    responseProjection: "Operational consulting request",
+    workflow,
+    cas: true,
+    auditRequired: true,
+    tables:
+      suffix === "012"
+        ? ["consulting_requests", "security_scope_authorizations", "audit_logs"]
+        : suffix === "013"
+          ? ["consulting_requests", "security_assessments", "security_reports", "audit_logs"]
+          : ["consulting_requests", "audit_logs"],
+    futureUi: ["UI-CON-003", "UI-ADM-020"],
+    release: "MVP v2",
+    status: foundation,
+  })),
+  {
+    apiId: "API-CON-014",
+    method: "GET",
+    path: "/consulting/requests/{requestId}/notes",
+    roles: ["ROLE_CONSULTANT", "ROLE_ADMIN"],
+    permission: "consulting.internal_note.manage",
+    scope: ["ASG", "Admin"],
+    requestContract: "Query: cursor?, limit?",
+    responseProjection: "InternalNote[] (never Business/client projection)",
+    workflow: null,
+    cas: false,
+    auditRequired: false,
+    tables: ["consulting_notes"],
+    futureUi: ["UI-CON-003", "UI-ADM-020"],
+    release: "MVP v2",
+    status: foundation,
+  },
+  {
+    apiId: "API-CON-015",
+    method: "POST",
+    path: "/consulting/requests/{requestId}/notes",
+    roles: ["ROLE_CONSULTANT", "ROLE_ADMIN"],
+    permission: "consulting.internal_note.manage",
+    scope: ["ASG", "Admin"],
+    requestContract: "InternalNoteInput",
+    responseProjection: "InternalNote",
+    workflow: null,
+    cas: false,
+    auditRequired: true,
+    tables: ["consulting_notes", "audit_logs"],
+    futureUi: ["UI-CON-003", "UI-ADM-020"],
+    release: "MVP v2",
+    status: foundation,
+  },
+];
+
+export const CONSULTING_CLIENT_VIEW_FIELDS = [
+  "id",
+  "requestedService",
+  "company/business summary",
+  "status",
+  "stateVersion",
+  "submittedAt",
+  "acceptedAt?",
+  "completedAt?",
+] as const;
