@@ -168,6 +168,7 @@ export class ScopeEvaluationService {
         resource,
         operation.conditionIds,
         routeParams,
+        operation.apiId,
       );
       if (!result.allowed) return resource ? { ...result, resource } : result;
     }
@@ -188,6 +189,7 @@ export class ScopeEvaluationService {
     resource: ResourceContext | null,
     conditionIds: readonly string[] | undefined,
     routeParams: Readonly<Record<string, string>>,
+    apiId: string | null,
   ): Promise<ScopeEvaluationResult> {
     switch (scopeType) {
       case "OWN":
@@ -209,7 +211,7 @@ export class ScopeEvaluationService {
       case "COND":
         return this.evaluateCond(conditionIds, actor, resource);
       case "AUTH_SCOPE":
-        return this.evaluateAuthScope(routeParams);
+        return this.evaluateAuthScope(routeParams, apiId);
       default:
         return {
           allowed: false,
@@ -227,7 +229,13 @@ export class ScopeEvaluationService {
    */
   private async evaluateAuthScope(
     routeParams: Readonly<Record<string, string>>,
+    apiId: string | null,
   ): Promise<ScopeEvaluationResult> {
+    if (apiId === "API-CON-012") {
+      const requestId = routeParams.requestId;
+      if (!requestId) return { allowed: false, reason: "AUTH_SCOPE: no requestId locator" };
+      return this.authScope.evaluateConsultingRequest(requestId);
+    }
     const assessmentId = routeParams.assessmentId;
     if (!assessmentId) {
       this.logger.warn("AUTH_SCOPE required but no assessmentId route locator was present");

@@ -67,6 +67,38 @@ export class AuthScopeEvaluator {
     return this.evaluateContext(context, input);
   }
 
+  /**
+   * API-CON-012 has a request locator, not an assessment locator. Its frozen
+   * policy requires only a current, non-revoked, time-valid authorization
+   * linked to that same request and employer; no undocumented service/activity
+   * classification is guessed here.
+   */
+  async evaluateConsultingRequest(requestId: string): Promise<AuthScopeEvaluationResult> {
+    const context = await this.repository.loadConsultingRequestScopeContext(requestId);
+    if (!context) return { allowed: false, reason: "AUTH_SCOPE: no request authorization context" };
+    const { request, authorization } = context;
+    if (
+      authorization.consultingRequestId !== request.id ||
+      authorization.employerId !== request.employerId
+    ) {
+      return { allowed: false, reason: "AUTH_SCOPE: request/employer linkage mismatch" };
+    }
+    if (!authorization.isCurrent) {
+      return { allowed: false, reason: "AUTH_SCOPE: authorization is not current" };
+    }
+    if (authorization.revokedAt !== null) {
+      return { allowed: false, reason: "AUTH_SCOPE: authorization has been revoked" };
+    }
+    const now = this.clock.now().getTime();
+    if (now < authorization.validFrom.getTime()) {
+      return { allowed: false, reason: "AUTH_SCOPE: not yet valid" };
+    }
+    if (authorization.validUntil && now > authorization.validUntil.getTime()) {
+      return { allowed: false, reason: "AUTH_SCOPE: expired" };
+    }
+    return { allowed: true };
+  }
+
   private evaluateContext(
     context: AssessmentSecurityContext,
     input: AuthScopeEvaluationInput,

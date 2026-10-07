@@ -31,6 +31,9 @@ export class ConsultingResourceResolver implements ResourceContextResolver {
       resourceType: this.resourceType,
       resourceId: actor.userId,
       employerId: actor.employerId,
+      // Collection ASG authorizes entry to an actor-scoped query; the
+      // repository independently reapplies assigned_consultant_id on every page.
+      assignedUserIds: [actor.userId],
     };
   }
 }

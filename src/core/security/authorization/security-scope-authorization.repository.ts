@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
+  consultingRequests,
   securityAssessments,
   securityScopeAuthorizations,
 } from "../../../infrastructure/database/schema";
@@ -101,6 +102,37 @@ export class SecurityScopeAuthorizationRepository {
     } catch (error) {
       this.logger.error(
         `Failed to load AUTH_SCOPE context for assessment ${assessmentId} — failing closed`,
+        error as Error,
+      );
+      return null;
+    }
+  }
+
+  /** Request-level evidence for API-CON-012 only; no assessment API is activated. */
+  async loadConsultingRequestScopeContext(consultingRequestId: string) {
+    try {
+      const [request] = await this.db
+        .select({ id: consultingRequests.id, employerId: consultingRequests.employerId })
+        .from(consultingRequests)
+        .where(eq(consultingRequests.id, consultingRequestId))
+        .limit(1);
+      if (!request) return null;
+
+      const [authorization] = await this.db
+        .select()
+        .from(securityScopeAuthorizations)
+        .where(
+          and(
+            eq(securityScopeAuthorizations.consultingRequestId, consultingRequestId),
+            eq(securityScopeAuthorizations.isCurrent, true),
+          ),
+        )
+        .limit(1);
+      if (!authorization) return null;
+      return { request, authorization };
+    } catch (error) {
+      this.logger.error(
+        `Failed to load request AUTH_SCOPE context for consulting request ${consultingRequestId} — failing closed`,
         error as Error,
       );
       return null;
