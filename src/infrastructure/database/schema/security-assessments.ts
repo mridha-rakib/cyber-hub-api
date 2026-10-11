@@ -58,10 +58,11 @@ export const securityAssessments = pgTable(
     index("security_assessments_service_idx").on(table.service),
     index("security_assessments_status_idx").on(table.status),
     index("security_assessments_started_at_idx").on(table.startedAt),
+    // ERD §7.30: "INDEX(employer_id,status,created_at DESC)".
     index("security_assessments_employer_status_created_idx").on(
       table.employerId,
       table.status,
-      table.createdAt,
+      table.createdAt.desc(),
     ),
     index("security_assessments_assigned_consultant_status_idx").on(
       table.assignedConsultantId,

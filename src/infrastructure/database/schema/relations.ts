@@ -26,6 +26,7 @@ import { submissions } from "./submissions";
 import { taskAssignments } from "./task-assignments";
 import { tasks } from "./tasks";
 import { users } from "./users";
+import { vulnerabilityFindings } from "./vulnerability-findings";
 
 export const employersRelations = relations(employers, ({ many }) => ({
   users: many(users),
@@ -33,6 +34,7 @@ export const employersRelations = relations(employers, ({ many }) => ({
   consultingRequests: many(consultingRequests),
   securityScopeAuthorizations: many(securityScopeAuthorizations),
   securityAssessments: many(securityAssessments),
+  vulnerabilityFindings: many(vulnerabilityFindings),
   careerListings: many(jobs),
   opportunities: many(employerOpportunities),
 }));
@@ -55,6 +57,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   authoredConsultingNotes: many(consultingNotes),
   confirmedScopeAuthorizations: many(securityScopeAuthorizations),
   assignedSecurityAssessments: many(securityAssessments),
+  createdVulnerabilityFindings: many(vulnerabilityFindings),
   submittedCareerListings: many(jobs),
   createdOpportunities: many(employerOpportunities),
 }));
@@ -109,7 +112,7 @@ export const securityScopeAuthorizationsRelations = relations(
   }),
 );
 
-export const securityAssessmentsRelations = relations(securityAssessments, ({ one }) => ({
+export const securityAssessmentsRelations = relations(securityAssessments, ({ one, many }) => ({
   employer: one(employers, {
     fields: [securityAssessments.employerId],
     references: [employers.id],
@@ -124,6 +127,22 @@ export const securityAssessmentsRelations = relations(securityAssessments, ({ on
   }),
   assignedConsultant: one(users, {
     fields: [securityAssessments.assignedConsultantId],
+    references: [users.id],
+  }),
+  findings: many(vulnerabilityFindings),
+}));
+
+export const vulnerabilityFindingsRelations = relations(vulnerabilityFindings, ({ one }) => ({
+  assessment: one(securityAssessments, {
+    fields: [vulnerabilityFindings.assessmentId],
+    references: [securityAssessments.id],
+  }),
+  employer: one(employers, {
+    fields: [vulnerabilityFindings.employerId],
+    references: [employers.id],
+  }),
+  createdByUser: one(users, {
+    fields: [vulnerabilityFindings.createdByUserId],
     references: [users.id],
   }),
 }));

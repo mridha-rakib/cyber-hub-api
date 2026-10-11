@@ -28,3 +28,4 @@ export * from "./submissions";
 export * from "./task-assignments";
 export * from "./tasks";
 export * from "./users";
+export * from "./vulnerability-findings";

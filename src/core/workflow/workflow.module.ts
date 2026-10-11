@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConsultingRequestWorkflowService } from "./consulting-request-workflow.service";
+import { FindingWorkflowService } from "./finding-workflow.service";
 import { SecurityAssessmentWorkflowService } from "./security-assessment-workflow.service";
 import { WorkflowValidationService } from "./workflow-validation.service";
 
@@ -13,11 +14,13 @@ import { WorkflowValidationService } from "./workflow-validation.service";
     WorkflowValidationService,
     ConsultingRequestWorkflowService,
     SecurityAssessmentWorkflowService,
+    FindingWorkflowService,
   ],
   exports: [
     WorkflowValidationService,
     ConsultingRequestWorkflowService,
     SecurityAssessmentWorkflowService,
+    FindingWorkflowService,
   ],
 })
 export class WorkflowModule {}

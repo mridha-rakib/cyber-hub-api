@@ -60,6 +60,26 @@ export const assessmentStatus = pgEnum("assessment_status", [
 ]);
 
 /**
+ * ERD §6 Enum Catalogue: "finding_severity | CRITICAL, HIGH, MEDIUM, LOW |
+ * SRS v2" — used by §7.31 `vulnerability_findings.severity` (FR-CON-005).
+ * Severity is deliberately a separate enum from `finding_status`: State &
+ * Workflow Spec v1.0 §6.4 "Severity ... is separate from lifecycle status".
+ */
+export const findingSeverity = pgEnum("finding_severity", ["CRITICAL", "HIGH", "MEDIUM", "LOW"]);
+
+/**
+ * ERD §6 Enum Catalogue: "finding_status | OPEN, REMEDIATION_IN_PROGRESS,
+ * RESOLVED | WF-FND" — used by §7.31 `vulnerability_findings.status`.
+ * Values only — the WF-FND-01..05 transitions live in the Wave 0D-6
+ * workflow registry.
+ */
+export const findingStatus = pgEnum("finding_status", [
+  "OPEN",
+  "REMEDIATION_IN_PROGRESS",
+  "RESOLVED",
+]);
+
+/**
  * ERD §7.19 internships.status: "DRAFT | PUBLISHED | CLOSED | ARCHIVED"
  * (source: WF-PRG, State & Workflow Spec v1.0 §3.1). Values only — the
  * WF-PRG-01..04 transition commands live in the Wave 0D-6 workflow

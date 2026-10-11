@@ -43,6 +43,13 @@
       "when": 1791363967552,
       "tag": "0005_wave4a_consulting_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791723137417,
+      "tag": "0006_wave5a_security_findings_foundation",
+      "breakpoints": true
     }
   ]
 }
