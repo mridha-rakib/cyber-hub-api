@@ -282,6 +282,17 @@ describe("Wave 4B Consulting HTTP APIs", () => {
     ];
     const results = await Promise.all(calls);
     expect(results.map((result) => result.status).sort()).toEqual([200, 409]);
+    expect(results.find((result) => result.status === 409)?.body.error).toMatchObject({
+      code: "STATE_VERSION_CONFLICT",
+      details: { currentStateVersion: 2 },
+    });
+    const wrongState = await auth(
+      request(app.getHttpServer()).post(`/api/v1/consulting/requests/${requestId}/start-review`),
+      consultantA,
+    )
+      .send({ expectedStateVersion: 2 })
+      .expect(409);
+    expect(wrongState.body.error.code).toBe("STATE_CONFLICT");
     await auth(
       request(app.getHttpServer()).post(`/api/v1/consulting/requests/${requestId}/accept`),
       consultantA,

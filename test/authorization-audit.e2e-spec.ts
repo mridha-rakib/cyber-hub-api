@@ -5,7 +5,7 @@ import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { configureApplication } from "../src/bootstrap";
 import { DATABASE_CONNECTION, type DatabaseConnection } from "../src/core/database/drizzle.config";
-import { NotFoundException, WorkflowConflictException } from "../src/core/errors/app.exception";
+import { NotFoundException } from "../src/core/errors/app.exception";
 import { AuthorizeOperation } from "../src/core/security/authorization/authorize-operation.decorator";
 import { RequirePermission } from "../src/core/security/authorization/require-permission.decorator";
 import {
@@ -14,6 +14,7 @@ import {
 } from "../src/core/security/authorization/resource-context-resolver";
 import { SecurityAssessmentWorkflowService } from "../src/core/workflow/security-assessment-workflow.service";
 import { WorkflowModule } from "../src/core/workflow/workflow.module";
+import { workflowConflictForCas } from "../src/core/workflow/workflow-helper";
 import {
   consultingRequests,
   securityAssessments,
@@ -71,7 +72,7 @@ class TestAuditController {
       expectedStateVersion,
     });
     if (result.outcome === "NOT_FOUND") throw new NotFoundException();
-    if (result.outcome === "CONFLICT") throw new WorkflowConflictException();
+    if (result.outcome === "CONFLICT") throw workflowConflictForCas(result);
     return { ok: true, status: result.toState, stateVersion: result.newVersion };
   }
 

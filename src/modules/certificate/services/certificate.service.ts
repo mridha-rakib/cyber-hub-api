@@ -1,5 +1,9 @@
 import { Injectable } from "@nestjs/common";
-import { ConflictException, NotFoundException } from "../../../core/errors/app.exception";
+import {
+  ConflictException,
+  NotFoundException,
+  WorkflowConflictException,
+} from "../../../core/errors/app.exception";
 import { OpaqueSecretService } from "../../../core/security/token/opaque-secret.service";
 import { requireTransition } from "../../../core/workflow/workflow-helper";
 import { UsersRepository } from "../../auth/repositories/users.repository";
@@ -67,7 +71,9 @@ export class CertificateService {
     if (!enrollment) throw new NotFoundException();
 
     if (enrollment.completionEligibility !== "ELIGIBLE") {
-      throw new ConflictException("This enrollment is not eligible for certificate issuance.");
+      throw new WorkflowConflictException(
+        "This enrollment is not eligible for certificate issuance.",
+      );
     }
 
     const existing = await this.certificatesRepository.findByEnrollmentId(enrollmentId);
@@ -134,7 +140,7 @@ export class CertificateService {
 
     const current = await this.certificatesRepository.findById(id);
     if (!current) throw new NotFoundException();
-    throw new ConflictException("This certificate has already been revoked.");
+    throw new WorkflowConflictException("This certificate has already been revoked.");
   }
 
   /**

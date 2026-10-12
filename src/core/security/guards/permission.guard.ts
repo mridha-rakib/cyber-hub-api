@@ -9,6 +9,7 @@ import {
   DatabaseException,
   NotFoundException,
   PermissionDeniedException,
+  SecurityScopeNotAuthorizedException,
 } from "../../errors/app.exception";
 import {
   API_AUTHORIZATION_BY_ID,
@@ -357,6 +358,9 @@ export class PermissionGuard implements CanActivate {
 
       if (disclosurePolicy === "CONCEAL_EXISTENCE") {
         throw new NotFoundException();
+      }
+      if (result.failedScope === "AUTH_SCOPE") {
+        throw new SecurityScopeNotAuthorizedException();
       }
       throw new PermissionDeniedException();
     }

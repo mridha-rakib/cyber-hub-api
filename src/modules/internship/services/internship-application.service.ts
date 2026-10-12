@@ -1,11 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionManager } from "../../../core/database/transaction.manager";
+import { NotFoundException, WorkflowConflictException } from "../../../core/errors/app.exception";
 import {
-  ConflictException,
-  NotFoundException,
-  WorkflowConflictException,
-} from "../../../core/errors/app.exception";
-import { requireTransition } from "../../../core/workflow/workflow-helper";
+  requireTransition,
+  workflowConflictForVersion,
+} from "../../../core/workflow/workflow-helper";
 import type { InternshipApplicationInput } from "../dto/application.dto";
 import { InternshipApplicationsRepository } from "../repositories/internship-applications.repository";
 import { InternshipEnrollmentsRepository } from "../repositories/internship-enrollments.repository";
@@ -33,7 +32,9 @@ export class InternshipApplicationService {
     const internship = await this.internshipsRepository.findById(internshipId);
     if (!internship) throw new NotFoundException();
     if (internship.status !== "PUBLISHED") {
-      throw new ConflictException("This internship is not currently accepting applications.");
+      throw new WorkflowConflictException(
+        "This internship is not currently accepting applications.",
+      );
     }
 
     requireTransition("InternshipApplication", "WF-APP-01");
@@ -89,7 +90,7 @@ export class InternshipApplicationService {
       { reviewerId, reviewStartedAt: new Date() },
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
   /**
@@ -108,7 +109,7 @@ export class InternshipApplicationService {
         expectedStateVersion,
         { reviewedAt: new Date() },
       );
-      if (!application) await this.assertExistsOrThrowConflict(id);
+      if (!application) await this.assertExistsOrThrowConflict(id, expectedStateVersion);
 
       const existingEnrollment = await this.enrollmentsRepository.findByApplicationId(
         application.id,
@@ -136,12 +137,15 @@ export class InternshipApplicationService {
       { reviewedAt: new Date(), decisionReason: reason },
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
-  private async assertExistsOrThrowConflict(id: string): Promise<never> {
+  private async assertExistsOrThrowConflict(
+    id: string,
+    expectedStateVersion: number,
+  ): Promise<never> {
     const current = await this.applicationsRepository.findById(id);
     if (!current) throw new NotFoundException();
-    throw new WorkflowConflictException();
+    throw workflowConflictForVersion(current.stateVersion, expectedStateVersion);
   }
 }

@@ -1,10 +1,9 @@
 import { Injectable } from "@nestjs/common";
+import { ConflictException, NotFoundException } from "../../../core/errors/app.exception";
 import {
-  ConflictException,
-  NotFoundException,
-  WorkflowConflictException,
-} from "../../../core/errors/app.exception";
-import { requireTransition } from "../../../core/workflow/workflow-helper";
+  requireTransition,
+  workflowConflictForVersion,
+} from "../../../core/workflow/workflow-helper";
 import type { SubmissionCreateInput, SubmissionResubmitInput } from "../dto/submission.dto";
 import { InternshipEnrollmentsRepository } from "../repositories/internship-enrollments.repository";
 import { SubmissionVersionsRepository } from "../repositories/submission-versions.repository";
@@ -81,7 +80,9 @@ export class SubmissionService {
       { currentVersion: nextVersion, submittedAt: new Date() },
     );
     if (!updated) {
-      throw new WorkflowConflictException();
+      const current = await this.submissionsRepository.findById(id);
+      if (!current || current.userId !== userId) throw new NotFoundException();
+      throw workflowConflictForVersion(current.stateVersion, input.expectedStateVersion);
     }
 
     await this.submissionVersionsRepository.create({

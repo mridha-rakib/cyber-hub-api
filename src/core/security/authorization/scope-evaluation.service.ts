@@ -9,6 +9,8 @@ export interface ScopeEvaluationResult {
   readonly allowed: boolean;
   /** Which specific scope check failed first, for internal logging only — never sent to the client. */
   readonly reason?: string;
+  /** Typed failure classification; does not change evaluation order or disclosure policy. */
+  readonly failedScope?: ScopeType;
   /**
    * Wave 0D-5 (Phase 6/7). Set to "NOT_FOUND" only when a registered
    * resolver actually ran and confirmed the resource does not exist — the
@@ -170,7 +172,9 @@ export class ScopeEvaluationService {
         routeParams,
         operation.apiId,
       );
-      if (!result.allowed) return resource ? { ...result, resource } : result;
+      if (!result.allowed) {
+        return { ...result, failedScope: scopeType, ...(resource ? { resource } : {}) };
+      }
     }
 
     return resource ? { allowed: true, resource } : { allowed: true };

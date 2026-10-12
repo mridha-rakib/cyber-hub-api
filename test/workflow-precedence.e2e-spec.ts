@@ -5,7 +5,7 @@ import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { configureApplication } from "../src/bootstrap";
 import { DATABASE_CONNECTION, type DatabaseConnection } from "../src/core/database/drizzle.config";
-import { NotFoundException, WorkflowConflictException } from "../src/core/errors/app.exception";
+import { NotFoundException } from "../src/core/errors/app.exception";
 import { RequirePermission } from "../src/core/security/authorization/require-permission.decorator";
 import {
   RESOURCE_CONTEXT_RESOLVERS,
@@ -13,6 +13,7 @@ import {
 } from "../src/core/security/authorization/resource-context-resolver";
 import { SecurityAssessmentWorkflowService } from "../src/core/workflow/security-assessment-workflow.service";
 import { WorkflowModule } from "../src/core/workflow/workflow.module";
+import { workflowConflictForCas } from "../src/core/workflow/workflow-helper";
 import {
   consultingRequests,
   securityAssessments,
@@ -72,7 +73,7 @@ class TestWorkflowController {
     });
 
     if (result.outcome === "NOT_FOUND") throw new NotFoundException();
-    if (result.outcome === "CONFLICT") throw new WorkflowConflictException();
+    if (result.outcome === "CONFLICT") throw workflowConflictForCas(result);
     return { ok: true, status: result.toState, stateVersion: result.newVersion };
   }
 }
@@ -308,11 +309,12 @@ describe("Wave 0D-6 authorization/disclosure/workflow precedence (real Postgres)
       "COMPLETED",
     );
 
-    await request(app.getHttpServer())
+    const response = await request(app.getHttpServer())
       .post(`/api/v1/test-workflow/assessment/${assessmentId}/cancel`)
       .set("Cookie", consultant.sessionCookie)
       .send({ expectedStateVersion: stateVersion })
       .expect(409);
+    expect(response.body.error.code).toBe("STATE_CONFLICT");
   });
 
   it("authorized + stale stateVersion -> 409", async () => {
@@ -327,11 +329,13 @@ describe("Wave 0D-6 authorization/disclosure/workflow precedence (real Postgres)
       "PLANNED",
     );
 
-    await request(app.getHttpServer())
+    const response = await request(app.getHttpServer())
       .post(`/api/v1/test-workflow/assessment/${assessmentId}/cancel`)
       .set("Cookie", consultant.sessionCookie)
       .send({ expectedStateVersion: stateVersion + 5 })
       .expect(409);
+    expect(response.body.error.code).toBe("STATE_VERSION_CONFLICT");
+    expect(response.body.error.details).toEqual({ currentStateVersion: stateVersion });
   });
 
   it("authorized + valid state + correct version -> success (200)", async () => {
@@ -392,11 +396,12 @@ describe("Wave 0D-6 authorization/disclosure/workflow precedence (real Postgres)
         "COMPLETED",
       );
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post(`/api/v1/test-workflow/assessment/${assessmentId}/cancel`)
         .set("Cookie", admin.sessionCookie)
         .send({ expectedStateVersion: stateVersion })
         .expect(409);
+      expect(response.body.error.code).toBe("STATE_CONFLICT");
     });
 
     it("Admin stale stateVersion -> 409, Admin gets no stateVersion bypass", async () => {
@@ -413,11 +418,13 @@ describe("Wave 0D-6 authorization/disclosure/workflow precedence (real Postgres)
         "PLANNED",
       );
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post(`/api/v1/test-workflow/assessment/${assessmentId}/cancel`)
         .set("Cookie", admin.sessionCookie)
         .send({ expectedStateVersion: stateVersion + 100 })
         .expect(409);
+      expect(response.body.error.code).toBe("STATE_VERSION_CONFLICT");
+      expect(response.body.error.details).toEqual({ currentStateVersion: stateVersion });
     });
 
     it("Admin technical action missing AUTH_SCOPE (revoked) -> authorization denial BEFORE workflow (403, not 409 — Admin's AUTH_SCOPE-only policy carries no ASG/resource-context requirement, so this is the established DISCLOSE_FORBIDDEN/NOT_APPLICABLE path from Wave 0D-5, not a regression)", async () => {
@@ -440,11 +447,12 @@ describe("Wave 0D-6 authorization/disclosure/workflow precedence (real Postgres)
         sql`update security_scope_authorizations set revoked_at = now() where consulting_request_id = (select consulting_request_id from security_assessments where id = ${assessmentId})`,
       );
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post(`/api/v1/test-workflow/assessment/${assessmentId}/cancel`)
         .set("Cookie", admin.sessionCookie)
         .send({ expectedStateVersion: stateVersion })
         .expect(403);
+      expect(response.body.error.code).toBe("SECURITY_SCOPE_NOT_AUTHORIZED");
     });
   });
 });

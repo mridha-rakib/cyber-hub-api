@@ -526,6 +526,88 @@ describe("Wave 0D-4B AUTH_SCOPE persistence + runtime enforcement", () => {
     });
   });
 
+  describe("D-6 disclosed AUTH_SCOPE failures", () => {
+    let business: Awaited<ReturnType<typeof registerAndLoginBusiness>>;
+    let other: Awaited<ReturnType<typeof registerAndLoginBusiness>>;
+    let admin: Awaited<ReturnType<typeof registerAndLoginLearner>>;
+
+    beforeAll(async () => {
+      business = await registerAndLoginBusiness("d6-scope-biz");
+      other = await registerAndLoginBusiness("d6-scope-other");
+      admin = await registerAndLoginLearner("d6-scope-admin");
+      await setRole(admin.userId, "ROLE_ADMIN");
+    });
+    it.each([
+      ["revoked", { revoked: true }],
+      ["non-current", { isCurrent: false }],
+      ["expired", { validUntil: new Date(Date.now() - 60_000) }],
+      ["not-yet-valid", { validFrom: new Date(Date.now() + 3_600_000) }],
+      ["disallowed-activity", { allowedActivities: ["PHISHING_AWARENESS"] }],
+      ["missing-target-coverage", { authorizedTargets: [] }],
+    ] satisfies [string, ScopeOptions][])(
+      "Admin receives the contract code for %s",
+      async (_label, options) => {
+        const { assessmentId } = await seedAssessment(
+          business.employerId,
+          business.userId,
+          admin.userId,
+          business.userId,
+          options,
+        );
+        const response = await request(app.getHttpServer())
+          .get(`/api/v1/test-auth-scope/assessment/${assessmentId}`)
+          .set("Cookie", admin.sessionCookie)
+          .expect(403);
+        expect(response.body.error).toEqual({
+          code: "SECURITY_SCOPE_NOT_AUTHORIZED",
+          message: "A current authorized security scope is required for this action.",
+        });
+      },
+    );
+
+    it("maps missing scope evidence without disclosing internals", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/test-auth-scope/assessment/00000000-0000-0000-0000-000000000000")
+        .set("Cookie", admin.sessionCookie)
+        .expect(403);
+      expect(response.body.error.code).toBe("SECURITY_SCOPE_NOT_AUTHORIZED");
+      expect(response.body.error.details).toBeUndefined();
+    });
+
+    it.each(["employer", "request"])(
+      "maps wrong %s linkage without exposing scope data",
+      async (linkage) => {
+        const seeded = await seedAssessment(
+          business.employerId,
+          business.userId,
+          admin.userId,
+          business.userId,
+        );
+        if (linkage === "employer") {
+          await queryRows(
+            sql`update security_scope_authorizations set employer_id = ${other.employerId} where id = ${seeded.scopeAuthorizationId}`,
+          );
+        } else {
+          const second = await seedAssessment(
+            other.employerId,
+            other.userId,
+            admin.userId,
+            other.userId,
+          );
+          await queryRows(
+            sql`update security_assessments set consulting_request_id = ${second.consultingRequestId} where id = ${seeded.assessmentId}`,
+          );
+        }
+        const response = await request(app.getHttpServer())
+          .get(`/api/v1/test-auth-scope/assessment/${seeded.assessmentId}`)
+          .set("Cookie", admin.sessionCookie)
+          .expect(403);
+        expect(response.body.error.code).toBe("SECURITY_SCOPE_NOT_AUTHORIZED");
+        expect(response.body.error.details).toBeUndefined();
+      },
+    );
+  });
+
   describe("non-technical operations are unaffected by the AUTH_SCOPE machinery", () => {
     it("Admin: assessment.read_client (scopes: [], no AUTH_SCOPE) is allowed even for a nonexistent assessment id", async () => {
       const admin = await registerAndLoginLearner("unaffected-admin");

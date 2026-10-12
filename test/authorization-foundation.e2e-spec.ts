@@ -237,15 +237,17 @@ describe("Wave 0D-2 authorization foundation", () => {
         .get("/api/v1/test-authz/consultant-technical")
         .set("Cookie", sessionCookie)
         .expect(403);
-      expect(response.body.error.code).toBe("FORBIDDEN");
+      expect(response.body.error.code).toBe("SECURITY_SCOPE_NOT_AUTHORIZED");
+      expect(response.body.error.details).toBeUndefined();
     });
 
     it("denies the ASG+AUTH_SCOPE-scoped permission for a role that isn't even granted it", async () => {
       const { sessionCookie } = await registerAndLoginLearner();
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .get("/api/v1/test-authz/consultant-technical")
         .set("Cookie", sessionCookie)
         .expect(403);
+      expect(response.body.error.code).toBe("FORBIDDEN");
     });
   });
 });

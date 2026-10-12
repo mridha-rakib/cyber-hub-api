@@ -1,6 +1,9 @@
 import { Injectable } from "@nestjs/common";
-import { NotFoundException, WorkflowConflictException } from "../../../core/errors/app.exception";
-import { requireTransition } from "../../../core/workflow/workflow-helper";
+import { NotFoundException } from "../../../core/errors/app.exception";
+import {
+  requireTransition,
+  workflowConflictForVersion,
+} from "../../../core/workflow/workflow-helper";
 import type { EmployerOpportunity } from "../../../infrastructure/database/schema";
 import type {
   EmployerOpportunityInput,
@@ -122,7 +125,7 @@ export class EmployerOpportunityService {
       patch,
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
   /** API-BIZOPP-005. REJECTED -> SUBMITTED. */
@@ -136,7 +139,7 @@ export class EmployerOpportunityService {
       {},
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
   /** API-BIZOPP-006. PUBLISHED -> CLOSED, own ORG opportunity. */
@@ -167,7 +170,7 @@ export class EmployerOpportunityService {
       {},
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
   /** API-MOD-OPP-02. UNDER_REVIEW -> PUBLISHED. */
@@ -181,7 +184,7 @@ export class EmployerOpportunityService {
       { publishedAt: new Date() },
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
   /** API-MOD-OPP-03. UNDER_REVIEW -> REJECTED; reason required. */
@@ -195,7 +198,7 @@ export class EmployerOpportunityService {
       { moderationReason: reason },
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
   /** API-MOD-OPP-04. PUBLISHED -> CLOSED, admin-moderated. Same transition as API-BIZOPP-006. */
@@ -213,12 +216,15 @@ export class EmployerOpportunityService {
       {},
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
-  private async assertExistsOrThrowConflict(id: string): Promise<never> {
+  private async assertExistsOrThrowConflict(
+    id: string,
+    expectedStateVersion: number,
+  ): Promise<never> {
     const current = await this.opportunitiesRepository.findById(id);
     if (!current) throw new NotFoundException();
-    throw new WorkflowConflictException();
+    throw workflowConflictForVersion(current.stateVersion, expectedStateVersion);
   }
 }

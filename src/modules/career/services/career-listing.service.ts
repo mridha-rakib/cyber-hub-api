@@ -1,6 +1,9 @@
 import { Injectable } from "@nestjs/common";
-import { NotFoundException, WorkflowConflictException } from "../../../core/errors/app.exception";
-import { requireTransition } from "../../../core/workflow/workflow-helper";
+import { NotFoundException } from "../../../core/errors/app.exception";
+import {
+  requireTransition,
+  workflowConflictForVersion,
+} from "../../../core/workflow/workflow-helper";
 import type { Job } from "../../../infrastructure/database/schema";
 import { EmployersRepository } from "../../auth/repositories/employers.repository";
 import type {
@@ -139,7 +142,7 @@ export class CareerListingService {
       patch,
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
   /** API-BIZCAR-005. REJECTED -> SUBMITTED. */
@@ -153,7 +156,7 @@ export class CareerListingService {
       {},
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
   /** API-BIZCAR-006. PUBLISHED -> CLOSED, own ORG listing. */
@@ -184,7 +187,7 @@ export class CareerListingService {
       {},
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
   /** API-MOD-CAR-02. UNDER_REVIEW -> PUBLISHED. */
@@ -198,7 +201,7 @@ export class CareerListingService {
       { publishedAt: new Date() },
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
   /** API-MOD-CAR-03. UNDER_REVIEW -> REJECTED; reason required. */
@@ -212,7 +215,7 @@ export class CareerListingService {
       { moderationReason: reason },
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
   /** API-MOD-CAR-04. PUBLISHED -> CLOSED, admin-moderated. Same transition as API-BIZCAR-006. */
@@ -230,12 +233,15 @@ export class CareerListingService {
       {},
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
-  private async assertExistsOrThrowConflict(id: string): Promise<never> {
+  private async assertExistsOrThrowConflict(
+    id: string,
+    expectedStateVersion: number,
+  ): Promise<never> {
     const current = await this.jobsRepository.findById(id);
     if (!current) throw new NotFoundException();
-    throw new WorkflowConflictException();
+    throw workflowConflictForVersion(current.stateVersion, expectedStateVersion);
   }
 }

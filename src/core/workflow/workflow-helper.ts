@@ -1,5 +1,26 @@
+import { StateVersionConflictException, WorkflowConflictException } from "../errors/app.exception";
+import type { CasTransitionOutcome } from "./transition.repository";
 import type { WorkflowEntityType, WorkflowTransitionId } from "./workflow.types";
 import { getWorkflowDefinition } from "./workflow-registry";
+
+/** Classifies a failed atomic write using a diagnostic read, after authorization. */
+export function workflowConflictForVersion(
+  currentStateVersion: number,
+  expectedStateVersion: number,
+) {
+  return currentStateVersion !== expectedStateVersion
+    ? new StateVersionConflictException(currentStateVersion)
+    : new WorkflowConflictException();
+}
+
+/** Shared HTTP exception mapping for the existing workflow foundations. */
+export function workflowConflictForCas(
+  result: Extract<CasTransitionOutcome, { outcome: "CONFLICT" }>,
+) {
+  return result.staleVersionSuspected
+    ? new StateVersionConflictException(result.currentStateVersion)
+    : new WorkflowConflictException();
+}
 
 /**
  * Looks up one named transition's `from`/`to` straight from the Wave 0D-6

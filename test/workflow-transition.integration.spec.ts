@@ -6,6 +6,7 @@ import { LoggerModule } from "../src/core/logger/logger.module";
 import { ConsultingRequestWorkflowService } from "../src/core/workflow/consulting-request-workflow.service";
 import { SecurityAssessmentWorkflowService } from "../src/core/workflow/security-assessment-workflow.service";
 import { WorkflowModule } from "../src/core/workflow/workflow.module";
+import { workflowConflictForCas } from "../src/core/workflow/workflow-helper";
 import {
   consultingRequests,
   employers,
@@ -178,6 +179,12 @@ describe("Workflow transition CAS — real PostgreSQL integration (Wave 0D-6)", 
         expectedStateVersion: seeded.stateVersion + 1, // stale/future version
       });
       expect(result.outcome).toBe("CONFLICT");
+      if (result.outcome !== "CONFLICT") throw new Error("Expected failed CAS");
+      expect(workflowConflictForCas(result)).toMatchObject({
+        code: "STATE_VERSION_CONFLICT",
+        statusCode: 409,
+        metadata: { currentStateVersion: seeded.stateVersion },
+      });
 
       const [row] = await db
         .select({
@@ -211,6 +218,11 @@ describe("Workflow transition CAS — real PostgreSQL integration (Wave 0D-6)", 
         expectedStateVersion: seeded.stateVersion,
       });
       expect(result.outcome).toBe("CONFLICT");
+      if (result.outcome !== "CONFLICT") throw new Error("Expected failed CAS");
+      expect(workflowConflictForCas(result)).toMatchObject({
+        code: "STATE_CONFLICT",
+        statusCode: 409,
+      });
 
       const [row] = await db
         .select({

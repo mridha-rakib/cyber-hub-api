@@ -1,6 +1,9 @@
 import { Injectable } from "@nestjs/common";
-import { NotFoundException, WorkflowConflictException } from "../../../core/errors/app.exception";
-import { requireTransition } from "../../../core/workflow/workflow-helper";
+import { NotFoundException } from "../../../core/errors/app.exception";
+import {
+  requireTransition,
+  workflowConflictForVersion,
+} from "../../../core/workflow/workflow-helper";
 import type { ReviewApprovalInput, RevisionRequestInput } from "../dto/review.dto";
 import { SubmissionsRepository } from "../repositories/submissions.repository";
 import type { ListParams } from "./internship-programme.service";
@@ -56,7 +59,7 @@ export class SubmissionReviewService {
       { reviewerId, reviewStartedAt: new Date() },
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
   /** API-REV-004. */
@@ -70,7 +73,7 @@ export class SubmissionReviewService {
       { approvedAt: new Date(), reviewFeedback: input.reviewNote ?? null },
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
   /** API-REV-005. */
@@ -84,12 +87,15 @@ export class SubmissionReviewService {
       { reviewFeedback: input.feedback },
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
-  private async assertExistsOrThrowConflict(id: string): Promise<never> {
+  private async assertExistsOrThrowConflict(
+    id: string,
+    expectedStateVersion: number,
+  ): Promise<never> {
     const current = await this.submissionsRepository.findById(id);
     if (!current) throw new NotFoundException();
-    throw new WorkflowConflictException();
+    throw workflowConflictForVersion(current.stateVersion, expectedStateVersion);
   }
 }

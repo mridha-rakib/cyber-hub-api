@@ -6,6 +6,7 @@ import { DATABASE_CONNECTION, type DatabaseConnection } from "../src/core/databa
 import { LoggerModule } from "../src/core/logger/logger.module";
 import { FindingWorkflowService } from "../src/core/workflow/finding-workflow.service";
 import { WorkflowModule } from "../src/core/workflow/workflow.module";
+import { workflowConflictForCas } from "../src/core/workflow/workflow-helper";
 import {
   consultingRequests,
   employers,
@@ -271,7 +272,16 @@ describe("Wave 5A security findings persistence — real PostgreSQL", () => {
       transitionIds: ["WF-FND-03", "WF-FND-04"],
       expectedStateVersion: 1,
     });
-    expect(stale).toMatchObject({ outcome: "CONFLICT", staleVersionSuspected: true });
+    expect(stale).toMatchObject({
+      outcome: "CONFLICT",
+      staleVersionSuspected: true,
+      currentStateVersion: 2,
+    });
+    if (stale.outcome !== "CONFLICT") throw new Error("Expected failed CAS");
+    expect(workflowConflictForCas(stale)).toMatchObject({
+      code: "STATE_VERSION_CONFLICT",
+      metadata: { currentStateVersion: 2 },
+    });
 
     const resolved = await findingWorkflow.transition({
       resourceId: finding.id,
@@ -308,6 +318,11 @@ describe("Wave 5A security findings persistence — real PostgreSQL", () => {
       expectedStateVersion: 1,
     });
     expect(reopenOpen).toMatchObject({ outcome: "CONFLICT", invalidStateSuspected: true });
+    if (reopenOpen.outcome !== "CONFLICT") throw new Error("Expected failed CAS");
+    expect(workflowConflictForCas(reopenOpen)).toMatchObject({
+      code: "STATE_CONFLICT",
+      statusCode: 409,
+    });
 
     // WF-FND-01 is a creation transition, never applicable to an existing row.
     const recreate = await findingWorkflow.transition({

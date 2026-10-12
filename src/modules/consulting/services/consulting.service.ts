@@ -1,11 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionManager } from "../../../core/database/transaction.manager";
+import { NotFoundException, PermissionDeniedException } from "../../../core/errors/app.exception";
 import {
-  NotFoundException,
-  PermissionDeniedException,
-  WorkflowConflictException,
-} from "../../../core/errors/app.exception";
-import { requireTransition } from "../../../core/workflow/workflow-helper";
+  requireTransition,
+  workflowConflictForVersion,
+} from "../../../core/workflow/workflow-helper";
 import type {
   ConsultingNote,
   ConsultingRequest,
@@ -215,7 +214,8 @@ export class ConsultingService {
 
   async complete(requestId: string, version: number) {
     if (!(await this.requests.hasOnlyCompletedLinkedWork(requestId))) {
-      throw new WorkflowConflictException();
+      const current = await this.requireRequest(requestId);
+      throw workflowConflictForVersion(current.stateVersion, version);
     }
     return this.transition(
       requestId,
@@ -260,8 +260,21 @@ export class ConsultingService {
       guard,
     );
     if (updated) return toOperationalView(updated);
-    await this.requireRequest(requestId);
-    throw new WorkflowConflictException();
+    const current = await this.requireRequest(requestId);
+    // A failed atomic AUTH_SCOPE guard is not a lifecycle conflict. Preserve
+    // API-CON-012's existing existence-hiding response after the guard race.
+    if (guard === "AUTH_SCOPE") {
+      const scope = await this.scopes.getCurrent(requestId, current.employerId);
+      const now = Date.now();
+      if (
+        !scope ||
+        now < scope.validFrom.getTime() ||
+        (scope.validUntil && now > scope.validUntil.getTime())
+      ) {
+        throw new NotFoundException();
+      }
+    }
+    throw workflowConflictForVersion(current.stateVersion, expectedStateVersion);
   }
 
   private async requireRequest(requestId: string) {

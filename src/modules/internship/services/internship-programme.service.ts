@@ -1,10 +1,9 @@
 import { Injectable } from "@nestjs/common";
+import { NotFoundException } from "../../../core/errors/app.exception";
 import {
-  ConflictException,
-  NotFoundException,
-  WorkflowConflictException,
-} from "../../../core/errors/app.exception";
-import { requireTransition } from "../../../core/workflow/workflow-helper";
+  requireTransition,
+  workflowConflictForVersion,
+} from "../../../core/workflow/workflow-helper";
 import type { InternshipUpdateInput, InternshipWriteInput } from "../dto/internship-write.dto";
 import { InternshipApplicationsRepository } from "../repositories/internship-applications.repository";
 import { InternshipsRepository } from "../repositories/internships.repository";
@@ -74,7 +73,7 @@ export class InternshipProgrammeService {
       patch,
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
   /** API-INT-005. */
@@ -88,7 +87,7 @@ export class InternshipProgrammeService {
       { publishedAt: new Date() },
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
   /** API-INT-006. */
@@ -102,7 +101,7 @@ export class InternshipProgrammeService {
       { closedAt: new Date() },
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
   /** API-INT-007. */
@@ -116,7 +115,7 @@ export class InternshipProgrammeService {
       {},
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
   /**
@@ -136,9 +135,7 @@ export class InternshipProgrammeService {
       1,
     );
     if (applications.length > 0) {
-      throw new ConflictException(
-        "This internship already has applications and can no longer be returned to draft.",
-      );
+      throw workflowConflictForVersion(existing.stateVersion, expectedStateVersion);
     }
 
     const transition = requireTransition("InternshipProgramme", "WF-PRG-04");
@@ -150,12 +147,15 @@ export class InternshipProgrammeService {
       { publishedAt: null },
     );
     if (updated) return updated;
-    await this.assertExistsOrThrowConflict(id);
+    await this.assertExistsOrThrowConflict(id, expectedStateVersion);
   }
 
-  private async assertExistsOrThrowConflict(id: string): Promise<never> {
+  private async assertExistsOrThrowConflict(
+    id: string,
+    expectedStateVersion: number,
+  ): Promise<never> {
     const current = await this.internshipsRepository.findById(id);
     if (!current) throw new NotFoundException();
-    throw new WorkflowConflictException();
+    throw workflowConflictForVersion(current.stateVersion, expectedStateVersion);
   }
 }

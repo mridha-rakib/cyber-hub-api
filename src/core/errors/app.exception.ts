@@ -148,15 +148,33 @@ export class UniqueConstraintConflictException extends AppException {
 }
 
 /**
- * Wave 0D-6. Raised only after authorization has already succeeded (see
- * workflow-transition.service.ts / Phase 12 precedence) — a stale
- * `stateVersion` or a transition that is not valid from the resource's
- * current persisted state. The external message is deliberately generic:
- * it never echoes the actual current state, tenant identity, assignment,
- * or AUTH_SCOPE details back to the client.
+ * Raised after authorization succeeds when the current lifecycle state or
+ * completion prerequisites reject an operation. Stale versions use the
+ * separate StateVersionConflictException (API Contract v1.2, sections 4.2/4.4).
  */
 export class WorkflowConflictException extends AppException {
   constructor(message = "Resource state has changed", metadata?: Record<string, unknown>) {
-    super({ code: ErrorCodes.CONFLICT, statusCode: HttpStatus.CONFLICT, message, metadata });
+    super({ code: ErrorCodes.STATE_CONFLICT, statusCode: HttpStatus.CONFLICT, message, metadata });
+  }
+}
+
+export class StateVersionConflictException extends AppException {
+  constructor(currentStateVersion: number) {
+    super({
+      code: ErrorCodes.STATE_VERSION_CONFLICT,
+      statusCode: HttpStatus.CONFLICT,
+      message: "The resource changed. Refresh and retry with the current version.",
+      metadata: { currentStateVersion },
+    });
+  }
+}
+
+export class SecurityScopeNotAuthorizedException extends AppException {
+  constructor() {
+    super({
+      code: ErrorCodes.SECURITY_SCOPE_NOT_AUTHORIZED,
+      statusCode: HttpStatus.FORBIDDEN,
+      message: "A current authorized security scope is required for this action.",
+    });
   }
 }

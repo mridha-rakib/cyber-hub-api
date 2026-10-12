@@ -27,16 +27,17 @@ export type CasTransitionOutcome =
    * The row exists but did not match the WHERE clause — either the
    * persisted state is not one of `allowedFromStates`, or the persisted
    * stateVersion no longer equals `expectedVersion` (or both). Both are
-   * external 409s; `staleVersionSuspected`/`invalidStateSuspected` are
-   * for internal logging only, computed from one diagnostic follow-up
+   * external 409s with distinct contract codes. Diagnostics are computed from one follow-up
    * read after the failed CAS attempt — never from a read that could have
    * informed the CAS decision itself.
    */
-  | {
+  | ({
       readonly outcome: "CONFLICT";
-      readonly staleVersionSuspected: boolean;
       readonly invalidStateSuspected: boolean;
-    };
+    } & (
+      | { readonly staleVersionSuspected: true; readonly currentStateVersion: number }
+      | { readonly staleVersionSuspected: false; readonly currentStateVersion?: number }
+    ));
 
 export interface CasTransitionTableRefs {
   readonly table: PgTable;
@@ -123,5 +124,18 @@ export async function executeCasTransition(
   logger.warn(
     `CAS transition conflict for id ${resourceId}: staleVersionSuspected=${staleVersionSuspected} invalidStateSuspected=${invalidStateSuspected}`,
   );
-  return { outcome: "CONFLICT", staleVersionSuspected, invalidStateSuspected };
+  const currentStateVersion = Number(current.stateVersion);
+  return staleVersionSuspected
+    ? {
+        outcome: "CONFLICT",
+        staleVersionSuspected: true,
+        invalidStateSuspected,
+        currentStateVersion,
+      }
+    : {
+        outcome: "CONFLICT",
+        staleVersionSuspected: false,
+        invalidStateSuspected,
+        currentStateVersion,
+      };
 }
