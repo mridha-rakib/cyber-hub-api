@@ -14,17 +14,20 @@ import { InternshipResourceResolver } from "../../modules/internship/resolvers/i
 import { SubmissionResourceResolver } from "../../modules/internship/resolvers/submission-resource.resolver";
 import { PortfolioModule } from "../../modules/portfolio/portfolio.module";
 import { PortfolioResourceResolver } from "../../modules/portfolio/resolvers/portfolio-resource.resolver";
+import {
+  AssessmentResourceResolver,
+  FindingResourceResolver,
+} from "../../modules/security-work/resolvers/security-work-resource.resolver";
+import { SecurityWorkModule } from "../../modules/security-work/security-work.module";
 import { UuidRouteParamGuard } from "../validation/uuid-route-param.guard";
-import { AuthScopeEvaluator } from "./authorization/auth-scope-evaluator.service";
+import { AuthScopeModule } from "./authorization/auth-scope.module";
 import { AuthorizationAuditService } from "./authorization/authorization-audit.service";
-import { CLOCK, SystemClock } from "./authorization/clock";
 import { ConditionRegistry } from "./authorization/condition-registry";
 import {
   RESOURCE_CONTEXT_RESOLVERS,
   ResourceContextResolverRegistry,
 } from "./authorization/resource-context-resolver";
 import { ScopeEvaluationService } from "./authorization/scope-evaluation.service";
-import { SecurityScopeAuthorizationRepository } from "./authorization/security-scope-authorization.repository";
 import { AuthGuard } from "./guards/auth.guard";
 import { PermissionGuard } from "./guards/permission.guard";
 
@@ -64,6 +67,8 @@ import { PermissionGuard } from "./guards/permission.guard";
     PortfolioModule,
     CareerModule,
     ConsultingModule,
+    AuthScopeModule,
+    SecurityWorkModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: AuthGuard },
@@ -95,6 +100,8 @@ import { PermissionGuard } from "./guards/permission.guard";
         career: CareerResourceResolver,
         employerOpportunity: EmployerOpportunityResourceResolver,
         consulting: ConsultingResourceResolver,
+        assessment: AssessmentResourceResolver,
+        finding: FindingResourceResolver,
       ) => [
         internship,
         submission,
@@ -104,6 +111,8 @@ import { PermissionGuard } from "./guards/permission.guard";
         career,
         employerOpportunity,
         consulting,
+        assessment,
+        finding,
       ],
       inject: [
         InternshipResourceResolver,
@@ -114,6 +123,8 @@ import { PermissionGuard } from "./guards/permission.guard";
         CareerResourceResolver,
         EmployerOpportunityResourceResolver,
         ConsultingResourceResolver,
+        AssessmentResourceResolver,
+        FindingResourceResolver,
       ],
     },
     ResourceContextResolverRegistry,
@@ -121,9 +132,6 @@ import { PermissionGuard } from "./guards/permission.guard";
     // bound to the real SystemClock in production; tests inject a
     // deterministic Clock directly into AuthScopeEvaluator without going
     // through this module.
-    { provide: CLOCK, useClass: SystemClock },
-    SecurityScopeAuthorizationRepository,
-    AuthScopeEvaluator,
     ScopeEvaluationService,
     // Wave 0D-7: central authorization-decision audit write path. Reuses
     // AuthModule's existing AuditLogsRepository (now exported for this

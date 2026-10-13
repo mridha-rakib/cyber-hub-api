@@ -175,13 +175,10 @@ export const WORKFLOW_OPERATION_MAP: Readonly<Partial<Record<ApiId, WorkflowOper
   // Vulnerability/security finding (§6.4).
   "API-FND-001": { kind: "TRANSITION", entityType: "Finding", transitionIds: ["WF-FND-01"] },
   "API-FND-004": {
-    // No documented state restriction on editing finding content
-    // (severity/description/evidence); Finding also has zero terminal
-    // states (§6.4), so all 3 states are conservatively allowed rather
-    // than inventing a narrower undocumented rule.
+    // D-3: resolved findings are immutable until the explicit reopen command.
     kind: "EDIT_GUARD",
     entityType: "Finding",
-    allowedStates: ["OPEN", "REMEDIATION_IN_PROGRESS", "RESOLVED"],
+    allowedStates: ["OPEN", "REMEDIATION_IN_PROGRESS"],
   },
   "API-FND-005": { kind: "TRANSITION", entityType: "Finding", transitionIds: ["WF-FND-02"] },
   "API-FND-006": {

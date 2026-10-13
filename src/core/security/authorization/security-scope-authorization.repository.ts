@@ -4,6 +4,7 @@ import {
   consultingRequests,
   securityAssessments,
   securityScopeAuthorizations,
+  vulnerabilityFindings,
 } from "../../../infrastructure/database/schema";
 import { TransactionManager } from "../../database/transaction.manager";
 import type { AssessmentSecurityContext } from "./auth-scope.types";
@@ -112,7 +113,11 @@ export class SecurityScopeAuthorizationRepository {
   async loadConsultingRequestScopeContext(consultingRequestId: string) {
     try {
       const [request] = await this.db
-        .select({ id: consultingRequests.id, employerId: consultingRequests.employerId })
+        .select({
+          id: consultingRequests.id,
+          employerId: consultingRequests.employerId,
+          requestedService: consultingRequests.requestedService,
+        })
         .from(consultingRequests)
         .where(eq(consultingRequests.id, consultingRequestId))
         .limit(1);
@@ -135,6 +140,26 @@ export class SecurityScopeAuthorizationRepository {
         `Failed to load request AUTH_SCOPE context for consulting request ${consultingRequestId} — failing closed`,
         error as Error,
       );
+      return null;
+    }
+  }
+
+  async loadFindingAssessmentId(findingId: string): Promise<string | null> {
+    try {
+      const [row] = await this.db
+        .select({ assessmentId: securityAssessments.id })
+        .from(vulnerabilityFindings)
+        .innerJoin(
+          securityAssessments,
+          and(
+            eq(vulnerabilityFindings.assessmentId, securityAssessments.id),
+            eq(vulnerabilityFindings.employerId, securityAssessments.employerId),
+          ),
+        )
+        .where(eq(vulnerabilityFindings.id, findingId))
+        .limit(1);
+      return row?.assessmentId ?? null;
+    } catch {
       return null;
     }
   }

@@ -240,6 +240,10 @@ export class ScopeEvaluationService {
       if (!requestId) return { allowed: false, reason: "AUTH_SCOPE: no requestId locator" };
       return this.authScope.evaluateConsultingRequest(requestId);
     }
+    if (apiId === "API-ASM-001") {
+      return this.authScope.evaluateAssessmentCreation(routeParams.requestId);
+    }
+    if (routeParams.findingId) return this.authScope.evaluateFinding(routeParams.findingId);
     const assessmentId = routeParams.assessmentId;
     if (!assessmentId) {
       this.logger.warn("AUTH_SCOPE required but no assessmentId route locator was present");

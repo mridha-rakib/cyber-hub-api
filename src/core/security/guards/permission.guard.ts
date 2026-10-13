@@ -184,7 +184,10 @@ export class PermissionGuard implements CanActivate {
 
     // Role-level check. ROLE_ADMIN receives no shortcut: it must appear in
     // this specific key's allowedRoles, exactly like every other role.
-    if (!definition.allowedRoles.includes(principal.role)) {
+    if (
+      !definition.allowedRoles.includes(principal.role) ||
+      (operationEntry && !operationEntry.roles.includes(principal.role))
+    ) {
       // Wave 0D-7 Phase 17: audited (when auditRequired) as a safe DENY —
       // never with resource/tenant/subject context, since no resource
       // resolution has happened yet at this point in the pipeline and none

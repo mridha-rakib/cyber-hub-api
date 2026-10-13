@@ -3,6 +3,8 @@ import { z } from "zod";
 export const CONSULTING_CURSOR_KINDS = {
   requests: "consulting-requests-submitted-at",
   notes: "consulting-notes-created-at",
+  assessments: "assessments-created-at",
+  findings: "findings-created-at",
 } as const;
 
 export type ConsultingCursorKind =

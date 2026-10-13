@@ -76,6 +76,14 @@ export class AuthScopeEvaluator {
   async evaluateConsultingRequest(requestId: string): Promise<AuthScopeEvaluationResult> {
     const context = await this.repository.loadConsultingRequestScopeContext(requestId);
     if (!context) return { allowed: false, reason: "AUTH_SCOPE: no request authorization context" };
+    return this.evaluateRequestContext(context);
+  }
+
+  private evaluateRequestContext(
+    context: NonNullable<
+      Awaited<ReturnType<SecurityScopeAuthorizationRepository["loadConsultingRequestScopeContext"]>>
+    >,
+  ) {
     const { request, authorization } = context;
     if (
       authorization.consultingRequestId !== request.id ||
@@ -174,5 +182,29 @@ export class AuthScopeEvaluator {
     }
 
     return { allowed: true };
+  }
+
+  async evaluateAssessmentCreation(requestId: string): Promise<AuthScopeEvaluationResult> {
+    const context = await this.repository.loadConsultingRequestScopeContext(requestId);
+    if (!context) return { allowed: false };
+    const validity = this.evaluateRequestContext(context);
+    if (!validity.allowed) return validity;
+    const { request, authorization } = context;
+    if (
+      !Array.isArray(authorization.authorizedTargets) ||
+      authorization.authorizedTargets.length === 0 ||
+      !authorization.authorizedTargets.every((value) => typeof value === "string") ||
+      !Array.isArray(authorization.allowedActivities) ||
+      !authorization.allowedActivities.every((value) => typeof value === "string") ||
+      !authorization.allowedActivities.includes(request.requestedService)
+    ) {
+      return { allowed: false, reason: "AUTH_SCOPE: target/activity coverage missing" };
+    }
+    return { allowed: true };
+  }
+
+  async evaluateFinding(findingId: string): Promise<AuthScopeEvaluationResult> {
+    const assessmentId = await this.repository.loadFindingAssessmentId(findingId);
+    return assessmentId ? this.evaluate({ assessmentId }) : { allowed: false };
   }
 }

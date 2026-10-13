@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionManager } from "../../../core/database/transaction.manager";
 import { NotFoundException, PermissionDeniedException } from "../../../core/errors/app.exception";
+import { RequestContextService } from "../../../core/request-context/request-context.service";
 import {
   requireTransition,
   workflowConflictForVersion,
@@ -96,6 +97,7 @@ export class ConsultingService {
     private readonly scopes: ScopeAuthorizationsRepository,
     private readonly audits: AuditLogsRepository,
     private readonly transactions: TransactionManager,
+    private readonly context?: RequestContextService,
   ) {}
 
   async create(employerId: string, userId: string, input: ConsultingRequestInput) {
@@ -174,12 +176,31 @@ export class ConsultingService {
     };
   }
 
-  async assign(requestId: string, consultantUserId: string) {
-    const existing = await this.requests.findById(requestId);
-    if (!existing) throw new NotFoundException();
-    const assigned = await this.requests.assignConsultant(requestId, consultantUserId);
-    if (!assigned) throw new NotFoundException();
-    return toOperationalView(assigned);
+  async assign(requestId: string, consultantUserId: string, principal: AuthPrincipal) {
+    if (principal.role !== "ROLE_ADMIN") throw new PermissionDeniedException();
+    return this.transactions.runInTransaction(async () => {
+      const existing = await this.requests.lockById(requestId);
+      if (!existing) throw new NotFoundException();
+      const assigned = await this.requests.assignConsultant(requestId, consultantUserId);
+      if (!assigned) throw new NotFoundException();
+      const affected = await this.requests.propagateActiveAssignment(requestId, consultantUserId);
+      await this.audits.record({
+        actorUserId: principal.userId,
+        actorRole: principal.role,
+        action: "consulting.request.consultant_assigned",
+        entityType: "consulting",
+        entityId: requestId,
+        requestId: this.context?.getRequestId(),
+        employerId: existing.employerId,
+        metadata: {
+          apiId: "API-CON-008",
+          oldConsultantId: existing.assignedConsultantId,
+          newConsultantId: consultantUserId,
+          affectedAssessmentIds: affected.map((row) => row.id),
+        },
+      });
+      return toOperationalView(assigned);
+    });
   }
 
   startReview(requestId: string, version: number) {
@@ -212,18 +233,26 @@ export class ConsultingService {
     return this.transition(requestId, "WF-REQ-05", version, {}, "AUTH_SCOPE");
   }
 
-  async complete(requestId: string, version: number) {
-    if (!(await this.requests.hasOnlyCompletedLinkedWork(requestId))) {
-      const current = await this.requireRequest(requestId);
-      throw workflowConflictForVersion(current.stateVersion, version);
-    }
-    return this.transition(
-      requestId,
-      "WF-REQ-06",
-      version,
-      { completedAt: new Date() },
-      "COMPLETION",
-    );
+  async complete(requestId: string, version: number, principal: AuthPrincipal) {
+    return this.transactions.runInTransaction(async () => {
+      const current = await this.requests.lockById(requestId);
+      if (!current) throw new NotFoundException();
+      if (principal.role !== "ROLE_ADMIN" && principal.role !== "ROLE_CONSULTANT")
+        throw new PermissionDeniedException();
+      if (principal.role === "ROLE_CONSULTANT" && current.assignedConsultantId !== principal.userId)
+        throw new NotFoundException();
+      if (!(await this.requests.hasOnlyCompletedLinkedWork(requestId))) {
+        const current = await this.requireRequest(requestId);
+        throw workflowConflictForVersion(current.stateVersion, version);
+      }
+      return this.transition(
+        requestId,
+        "WF-REQ-06",
+        version,
+        { completedAt: new Date() },
+        "COMPLETION",
+      );
+    });
   }
 
   async listNotes(requestId: string, query: NotesListQuery) {

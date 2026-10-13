@@ -103,10 +103,11 @@ export class ConsultingController {
   @Post("admin/consulting-requests/:requestId/assign-consultant")
   @HttpCode(200)
   assign(
+    @CurrentUser() principal: AuthPrincipal,
     @Param("requestId") requestId: string,
     @Body(new ValidationPipe(consultantAssignmentInputSchema)) body: ConsultantAssignmentInput,
   ) {
-    return this.consulting.assign(requestId, body.consultantUserId);
+    return this.consulting.assign(requestId, body.consultantUserId, principal);
   }
 
   @AuthorizeOperation("API-CON-009")
@@ -159,10 +160,11 @@ export class ConsultingController {
   @Post("consulting/requests/:requestId/complete")
   @HttpCode(200)
   complete(
+    @CurrentUser() principal: AuthPrincipal,
     @Param("requestId") requestId: string,
     @Body(new ValidationPipe(transitionInputSchema)) body: TransitionInput,
   ) {
-    return this.consulting.complete(requestId, body.expectedStateVersion);
+    return this.consulting.complete(requestId, body.expectedStateVersion, principal);
   }
 
   @AuthorizeOperation("API-CON-014")

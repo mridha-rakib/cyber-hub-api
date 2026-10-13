@@ -67,6 +67,29 @@ export class ConsultingRequestsRepository {
     return row ?? null;
   }
 
+  async lockById(id: string) {
+    const [row] = await this.db
+      .select()
+      .from(consultingRequests)
+      .where(eq(consultingRequests.id, id))
+      .for("update")
+      .limit(1);
+    return row ?? null;
+  }
+
+  async propagateActiveAssignment(requestId: string, consultantUserId: string) {
+    return this.db
+      .update(securityAssessments)
+      .set({ assignedConsultantId: consultantUserId, updatedAt: new Date() })
+      .where(
+        and(
+          eq(securityAssessments.consultingRequestId, requestId),
+          inArray(securityAssessments.status, ["PLANNED", "IN_PROGRESS"]),
+        ),
+      )
+      .returning({ id: securityAssessments.id });
+  }
+
   async findOwnById(id: string, employerId: string) {
     const [row] = await this.db
       .select()
@@ -168,10 +191,11 @@ export class ConsultingRequestsRepository {
           ? sql`exists (
               select 1 from security_assessments assessment
               where assessment.consulting_request_id = ${consultingRequests.id}
+                and assessment.status = 'COMPLETED'
             ) and not exists (
               select 1 from security_assessments assessment
               where assessment.consulting_request_id = ${consultingRequests.id}
-                and assessment.status <> 'COMPLETED'
+                and assessment.status in ('PLANNED', 'IN_PROGRESS')
             )`
           : undefined;
     const [row] = await this.db
@@ -223,8 +247,8 @@ export class ConsultingRequestsRepository {
   async hasOnlyCompletedLinkedWork(id: string): Promise<boolean> {
     const [count] = await this.db
       .select({
-        total: sql<number>`count(*)::int`,
-        incomplete: sql<number>`count(*) filter (where ${securityAssessments.status} <> 'COMPLETED')::int`,
+        total: sql<number>`count(*) filter (where ${securityAssessments.status} = 'COMPLETED')::int`,
+        incomplete: sql<number>`count(*) filter (where ${securityAssessments.status} in ('PLANNED', 'IN_PROGRESS'))::int`,
       })
       .from(securityAssessments)
       .where(eq(securityAssessments.consultingRequestId, id));

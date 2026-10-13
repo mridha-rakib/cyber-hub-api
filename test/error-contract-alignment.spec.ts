@@ -136,15 +136,16 @@ describe("D-6 error contract", () => {
       const service = new ConsultingService(
         stub({
           hasOnlyCompletedLinkedWork: jest.fn().mockResolvedValue(false),
+          lockById: jest.fn().mockResolvedValue({ stateVersion }),
           findById: jest.fn().mockResolvedValue({ stateVersion }),
           transitionWithExtras,
         }),
         stub({}),
         stub({}),
         stub({}),
-        stub({}),
+        stub({ runInTransaction: (work: () => Promise<unknown>) => work() }),
       );
-      await expect(service.complete("id", 3)).rejects.toMatchObject({
+      await expect(service.complete("id", 3, stub({ role: "ROLE_ADMIN" }))).rejects.toMatchObject({
         statusCode: 409,
         code: stateVersion === 3 ? "STATE_CONFLICT" : "STATE_VERSION_CONFLICT",
       });
