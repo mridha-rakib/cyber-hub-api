@@ -80,6 +80,20 @@ export const findingStatus = pgEnum("finding_status", [
 ]);
 
 /**
+ * ERD §6 Enum Catalogue: "report_status | DRAFT, IN_REVIEW,
+ * READY_FOR_RELEASE, RELEASED, SUPERSEDED | WF-RPT" — used by §7.33
+ * `security_reports.status`. Values only — the WF-RPT-01..07 transitions
+ * live in the workflow registry; their commands are Wave 6B.
+ */
+export const reportStatus = pgEnum("report_status", [
+  "DRAFT",
+  "IN_REVIEW",
+  "READY_FOR_RELEASE",
+  "RELEASED",
+  "SUPERSEDED",
+]);
+
+/**
  * ERD §7.19 internships.status: "DRAFT | PUBLISHED | CLOSED | ARCHIVED"
  * (source: WF-PRG, State & Workflow Spec v1.0 §3.1). Values only — the
  * WF-PRG-01..04 transition commands live in the Wave 0D-6 workflow

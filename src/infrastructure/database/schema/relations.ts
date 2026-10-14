@@ -19,7 +19,10 @@ import { portfolioProjects } from "./portfolio-projects";
 import { portfolioSkills } from "./portfolio-skills";
 import { portfolios } from "./portfolios";
 import { securityAssessments } from "./security-assessments";
+import { securityReportFindings } from "./security-report-findings";
+import { securityReports } from "./security-reports";
 import { securityScopeAuthorizations } from "./security-scope-authorizations";
+import { securityScores } from "./security-scores";
 import { sessions } from "./sessions";
 import { submissionVersions } from "./submission-versions";
 import { submissions } from "./submissions";
@@ -35,6 +38,8 @@ export const employersRelations = relations(employers, ({ many }) => ({
   securityScopeAuthorizations: many(securityScopeAuthorizations),
   securityAssessments: many(securityAssessments),
   vulnerabilityFindings: many(vulnerabilityFindings),
+  securityScores: many(securityScores),
+  securityReports: many(securityReports),
   careerListings: many(jobs),
   opportunities: many(employerOpportunities),
 }));
@@ -58,6 +63,10 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   confirmedScopeAuthorizations: many(securityScopeAuthorizations),
   assignedSecurityAssessments: many(securityAssessments),
   createdVulnerabilityFindings: many(vulnerabilityFindings),
+  calculatedSecurityScores: many(securityScores),
+  preparedSecurityReports: many(securityReports, { relationName: "securityReportPreparer" }),
+  reviewedSecurityReports: many(securityReports, { relationName: "securityReportReviewer" }),
+  releasedSecurityReports: many(securityReports, { relationName: "securityReportReleaser" }),
   submittedCareerListings: many(jobs),
   createdOpportunities: many(employerOpportunities),
 }));
@@ -130,9 +139,11 @@ export const securityAssessmentsRelations = relations(securityAssessments, ({ on
     references: [users.id],
   }),
   findings: many(vulnerabilityFindings),
+  scores: many(securityScores),
+  reports: many(securityReports),
 }));
 
-export const vulnerabilityFindingsRelations = relations(vulnerabilityFindings, ({ one }) => ({
+export const vulnerabilityFindingsRelations = relations(vulnerabilityFindings, ({ one, many }) => ({
   assessment: one(securityAssessments, {
     fields: [vulnerabilityFindings.assessmentId],
     references: [securityAssessments.id],
@@ -144,6 +155,67 @@ export const vulnerabilityFindingsRelations = relations(vulnerabilityFindings, (
   createdByUser: one(users, {
     fields: [vulnerabilityFindings.createdByUserId],
     references: [users.id],
+  }),
+  reportMemberships: many(securityReportFindings),
+}));
+
+export const securityScoresRelations = relations(securityScores, ({ one }) => ({
+  employer: one(employers, {
+    fields: [securityScores.employerId],
+    references: [employers.id],
+  }),
+  assessment: one(securityAssessments, {
+    fields: [securityScores.assessmentId],
+    references: [securityAssessments.id],
+  }),
+  calculatedByUser: one(users, {
+    fields: [securityScores.calculatedByUserId],
+    references: [users.id],
+  }),
+}));
+
+export const securityReportsRelations = relations(securityReports, ({ one, many }) => ({
+  assessment: one(securityAssessments, {
+    fields: [securityReports.assessmentId],
+    references: [securityAssessments.id],
+  }),
+  employer: one(employers, {
+    fields: [securityReports.employerId],
+    references: [employers.id],
+  }),
+  preparedByUser: one(users, {
+    fields: [securityReports.preparedByUserId],
+    references: [users.id],
+    relationName: "securityReportPreparer",
+  }),
+  reviewedByUser: one(users, {
+    fields: [securityReports.reviewedByUserId],
+    references: [users.id],
+    relationName: "securityReportReviewer",
+  }),
+  releasedByUser: one(users, {
+    fields: [securityReports.releasedByUserId],
+    references: [users.id],
+    relationName: "securityReportReleaser",
+  }),
+  // Lineage only (ERD §7.33); written by the explicit API-RPT-009 supersede.
+  supersedesReport: one(securityReports, {
+    fields: [securityReports.supersedesReportId],
+    references: [securityReports.id],
+    relationName: "securityReportLineage",
+  }),
+  supersededByReports: many(securityReports, { relationName: "securityReportLineage" }),
+  findings: many(securityReportFindings),
+}));
+
+export const securityReportFindingsRelations = relations(securityReportFindings, ({ one }) => ({
+  report: one(securityReports, {
+    fields: [securityReportFindings.reportId],
+    references: [securityReports.id],
+  }),
+  finding: one(vulnerabilityFindings, {
+    fields: [securityReportFindings.findingId],
+    references: [vulnerabilityFindings.id],
   }),
 }));
 
