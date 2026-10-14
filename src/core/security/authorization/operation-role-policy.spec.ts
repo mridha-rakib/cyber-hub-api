@@ -13,8 +13,8 @@ const allEntries: readonly [string, OperationRolePolicies][] = Object.entries(
 const allPolicies: readonly OperationRolePolicies[] = allEntries.map(([, policies]) => policies);
 
 describe("OPERATION_ROLE_POLICIES", () => {
-  it("covers exactly the 36 operations identified by the Wave 0D-4 audit", () => {
-    expect(Object.keys(OPERATION_ROLE_POLICIES).length).toBe(36);
+  it("covers exactly the 36 Wave 0D-4 operations plus API Contract v1.3 API-RPT-013", () => {
+    expect(Object.keys(OPERATION_ROLE_POLICIES).length).toBe(37);
   });
 
   it("every apiId is a real, known API_AUTHORIZATION_MAP entry", () => {

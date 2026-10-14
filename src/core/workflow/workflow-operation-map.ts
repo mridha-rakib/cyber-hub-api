@@ -298,7 +298,13 @@ export const WORKFLOW_OPERATION_MAP: Readonly<Partial<Record<ApiId, WorkflowOper
   "API-RPT-003": { kind: "EDIT_GUARD", entityType: "Report", allowedStates: ["DRAFT"] },
   "API-RPT-004": { kind: "EDIT_GUARD", entityType: "Report", allowedStates: ["DRAFT"] },
   "API-RPT-005": { kind: "TRANSITION", entityType: "Report", transitionIds: ["WF-RPT-02"] },
-  "API-RPT-006": { kind: "TRANSITION", entityType: "Report", transitionIds: ["WF-RPT-03"] },
+  // IN_REVIEW -> DRAFT (Consultant/Admin) or READY_FOR_RELEASE -> DRAFT (Admin
+  // only, enforced by the report service) — API Contract v1.3 API-RPT-006.
+  "API-RPT-006": {
+    kind: "TRANSITION",
+    entityType: "Report",
+    transitionIds: ["WF-RPT-03", "WF-RPT-05"],
+  },
   "API-RPT-007": { kind: "TRANSITION", entityType: "Report", transitionIds: ["WF-RPT-04"] },
   "API-RPT-008": { kind: "TRANSITION", entityType: "Report", transitionIds: ["WF-RPT-06"] },
   "API-RPT-009": { kind: "TRANSITION", entityType: "Report", transitionIds: ["WF-RPT-07"] },

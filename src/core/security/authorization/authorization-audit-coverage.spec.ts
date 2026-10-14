@@ -6,13 +6,13 @@ import { API_AUTHORIZATION_MAP } from "./api-authorization-map";
  * `auditRequired` metadata is caught by a failing test rather than
  * silently drifting.
  */
-describe("209-operation auditRequired coverage — Wave 0D-7", () => {
+describe("210-operation auditRequired coverage — Wave 0D-7 (API Contract v1.3 adds the non-audited API-RPT-013 read)", () => {
   const auditRequiredOps = API_AUTHORIZATION_MAP.filter((op) => op.auditRequired);
 
   it("recomputes the exact TOTAL/AUDIT_REQUIRED/AUDIT_NOT_REQUIRED counts", () => {
-    expect(API_AUTHORIZATION_MAP.length).toBe(209);
+    expect(API_AUTHORIZATION_MAP.length).toBe(210);
     expect(auditRequiredOps.length).toBe(83);
-    expect(API_AUTHORIZATION_MAP.length - auditRequiredOps.length).toBe(126);
+    expect(API_AUTHORIZATION_MAP.length - auditRequiredOps.length).toBe(127);
   });
 
   it("82 of the 83 audit-required operations are PERMISSION_PROTECTED — supportable by the central PermissionGuard authorization-decision pipeline this Wave", () => {

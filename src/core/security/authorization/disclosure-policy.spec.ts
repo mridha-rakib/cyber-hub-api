@@ -17,16 +17,16 @@ const VALID_POLICIES: ReadonlySet<AuthorizationDisclosurePolicy> = new Set([
   "NOT_APPLICABLE",
 ]);
 
-describe("disclosure-policy — Wave 0D-5 209-operation coverage audit", () => {
-  it("classifies exactly 209 operations with no unknown/undefined result", () => {
-    expect(API_AUTHORIZATION_MAP.length).toBe(209);
+describe("disclosure-policy — Wave 0D-5 operation coverage audit (210 operations since API Contract v1.3)", () => {
+  it("classifies exactly 210 operations with no unknown/undefined result", () => {
+    expect(API_AUTHORIZATION_MAP.length).toBe(210);
     for (const op of API_AUTHORIZATION_MAP) {
       const policy = resolveDisclosurePolicyForOperation(op);
       expect(VALID_POLICIES.has(policy)).toBe(true);
     }
   });
 
-  it("produces the exact, doc-verified distribution: 40 DISCLOSE_FORBIDDEN / 88 CONCEAL_EXISTENCE / 81 NOT_APPLICABLE", () => {
+  it("produces the exact, doc-verified distribution: 40 DISCLOSE_FORBIDDEN / 89 CONCEAL_EXISTENCE (API-RPT-013 added by v1.3) / 81 NOT_APPLICABLE", () => {
     const counts: Record<AuthorizationDisclosurePolicy, number> = {
       DISCLOSE_FORBIDDEN: 0,
       CONCEAL_EXISTENCE: 0,
@@ -36,9 +36,9 @@ describe("disclosure-policy — Wave 0D-5 209-operation coverage audit", () => {
       counts[resolveDisclosurePolicyForOperation(op)]++;
     }
     expect(counts.DISCLOSE_FORBIDDEN).toBe(40);
-    expect(counts.CONCEAL_EXISTENCE).toBe(88);
+    expect(counts.CONCEAL_EXISTENCE).toBe(89);
     expect(counts.NOT_APPLICABLE).toBe(81);
-    expect(counts.DISCLOSE_FORBIDDEN + counts.CONCEAL_EXISTENCE + counts.NOT_APPLICABLE).toBe(209);
+    expect(counts.DISCLOSE_FORBIDDEN + counts.CONCEAL_EXISTENCE + counts.NOT_APPLICABLE).toBe(210);
   });
 
   it("every PUBLIC and AUTHENTICATED_ONLY operation is NOT_APPLICABLE (no identifiable protected resource to conceal)", () => {

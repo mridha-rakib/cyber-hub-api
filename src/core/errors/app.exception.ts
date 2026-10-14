@@ -178,3 +178,35 @@ export class SecurityScopeNotAuthorizedException extends AppException {
     });
   }
 }
+
+/**
+ * Service-level domain validation (API Contract v1.3 section 4: 422 for a
+ * well-formed request that fails allow-listed field/domain validation), e.g.
+ * report findingIds that do not all belong to the report's assessment and
+ * employer. The message is deliberately generic so it never discloses which
+ * referenced record exists.
+ */
+export class DomainValidationException extends AppException {
+  constructor(message = "Validation failed") {
+    super({
+      code: ErrorCodes.VALIDATION_ERROR,
+      statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+      message,
+    });
+  }
+}
+
+/**
+ * API Contract v1.3 D6-3: report artifact release (API-RPT-008) is rejected
+ * with no state change while the GAP-013 file/storage policy is not
+ * configured.
+ */
+export class FilePolicyNotConfiguredException extends AppException {
+  constructor() {
+    super({
+      code: ErrorCodes.FILE_POLICY_NOT_CONFIGURED,
+      statusCode: HttpStatus.CONFLICT,
+      message: "The report file and storage policy is not configured.",
+    });
+  }
+}

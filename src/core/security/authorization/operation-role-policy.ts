@@ -29,7 +29,9 @@ import type { ScopeType } from "./scope.types";
  * Phase 2 full-209-operation audit (every multi-role entry in the map —
  * there are no others). Every other operation (single-role, or the rare
  * genuinely-uniform multi-role case, of which none were found) is
- * untouched and continues to use the flat map fields.
+ * untouched and continues to use the flat map fields. API Contract v1.3
+ * adds the multi-role API-RPT-013 ("[ASG / Admin]", D6-9), bringing the
+ * total to 37.
  */
 export interface OperationRolePolicy {
   readonly scopes: readonly ScopeType[];
@@ -505,6 +507,20 @@ export const OPERATION_ROLE_POLICIES: Readonly<Partial<Record<ApiId, OperationRo
     },
   },
   "API-RPT-006": {
+    ROLE_CONSULTANT: {
+      scopes: ["ASG"],
+      assignmentRequired: true,
+      authScopeRequired: false,
+      resourceContextRequired: true,
+    },
+    ROLE_ADMIN: {
+      scopes: [],
+      assignmentRequired: false,
+      authScopeRequired: false,
+      resourceContextRequired: false,
+    },
+  },
+  "API-RPT-013": {
     ROLE_CONSULTANT: {
       scopes: ["ASG"],
       assignmentRequired: true,

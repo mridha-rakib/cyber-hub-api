@@ -17,6 +17,7 @@ export const ErrorCodes = {
   CSRF_INVALID: "CSRF_INVALID",
   RATE_LIMITED: "RATE_LIMITED",
   UNIQUE_CONSTRAINT_CONFLICT: "UNIQUE_CONSTRAINT_CONFLICT",
+  FILE_POLICY_NOT_CONFIGURED: "FILE_POLICY_NOT_CONFIGURED",
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];

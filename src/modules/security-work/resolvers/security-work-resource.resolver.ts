@@ -46,9 +46,13 @@ export class AssessmentResourceResolver implements ResourceContextResolver {
       const row = await this.work.assessment(routeParams.assessmentId);
       return row ? assignedContext(row, this.resourceType, row.assessment.id) : null;
     }
+    // Collection operations resolve against the actor's own context: ORG
+    // collections (API-ASM-007) authorize against the actor's employer, ASG
+    // collections against the actor. Repositories reapply the real predicate.
     return {
       resourceType: this.resourceType,
       resourceId: actor.userId,
+      employerId: actor.employerId,
       assignedUserIds: [actor.userId],
     };
   }

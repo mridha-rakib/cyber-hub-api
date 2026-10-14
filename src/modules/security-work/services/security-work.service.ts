@@ -22,6 +22,7 @@ import type {
 } from "../../../infrastructure/database/schema";
 import { AuditLogsRepository } from "../../auth/repositories/audit-logs.repository";
 import type { AuthPrincipal } from "../../auth/services/session-authentication.types";
+import { requireEmployerId } from "../../career/current-employer.util";
 import {
   buildConsultingCursorPage,
   CONSULTING_CURSOR_KINDS,
@@ -29,11 +30,17 @@ import {
 import { ConsultingRequestsRepository } from "../../consulting/repositories/consulting-requests.repository";
 import type {
   AssessmentListQuery,
+  BusinessAssessmentListQuery,
   FindingCreateInput,
   FindingListQuery,
   FindingUpdateInput,
 } from "../dto/security-work.dto";
 import { SecurityWorkRepository } from "../repositories/security-work.repository";
+import {
+  requireAssessmentAccess,
+  requireOperationalRole,
+  requireRequestAccess,
+} from "../security-work-access";
 
 /** D-3 applies to every actor, including Admin, before any finding write. */
 export function requireFindingMutation(
@@ -61,7 +68,8 @@ function assessmentView(row: SecurityAssessment) {
     updatedAt: row.updatedAt,
   };
 }
-function findingView(row: VulnerabilityFinding) {
+/** Internal (Consultant/Admin) finding projection, reused by the report detail. */
+export function findingView(row: VulnerabilityFinding) {
   return {
     id: row.id,
     assessmentId: row.assessmentId,
@@ -77,6 +85,24 @@ function findingView(row: VulnerabilityFinding) {
     createdByUserId: row.createdByUserId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+  };
+}
+/** AssessmentClientView (API Contract v1.3): the only Business assessment projection. */
+export function assessmentClientView(row: {
+  id: string;
+  service: SecurityAssessment["service"];
+  status: SecurityAssessment["status"];
+  startedAt: Date | null;
+  completedAt: Date | null;
+  createdAt: Date;
+}) {
+  return {
+    id: row.id,
+    service: row.service,
+    status: row.status,
+    startedAt: row.startedAt,
+    completedAt: row.completedAt,
+    createdAt: row.createdAt,
   };
 }
 type AssessmentContext = NonNullable<Awaited<ReturnType<SecurityWorkRepository["assessment"]>>>;
@@ -147,6 +173,23 @@ export class SecurityWorkService {
     if (!row) throw new NotFoundException();
     this.access(row, principal);
     return assessmentView(row.assessment);
+  }
+  async listClientAssessments(principal: AuthPrincipal, query: BusinessAssessmentListQuery) {
+    const employerId = requireEmployerId(principal);
+    const rows = await this.work.listClientAssessments(employerId, query);
+    const page = buildConsultingCursorPage(
+      rows,
+      query.limit,
+      CONSULTING_CURSOR_KINDS.businessAssessments,
+      (r) => r.createdAt,
+      (r) => r.id,
+    );
+    return { data: page.data.map(assessmentClientView), meta: page.meta };
+  }
+  async getClientAssessment(id: string, principal: AuthPrincipal) {
+    const row = await this.work.clientAssessment(id, requireEmployerId(principal));
+    if (!row) throw new NotFoundException();
+    return assessmentClientView(row);
   }
   async assessmentCommand(
     id: string,
@@ -357,22 +400,13 @@ export class SecurityWorkService {
     return row;
   }
   private role(principal: AuthPrincipal) {
-    if (principal.role !== "ROLE_ADMIN" && principal.role !== "ROLE_CONSULTANT")
-      throw new PermissionDeniedException();
+    requireOperationalRole(principal);
   }
   private accessRequest(request: ConsultingRequest, principal: AuthPrincipal) {
-    this.role(principal);
-    if (principal.role === "ROLE_CONSULTANT" && request.assignedConsultantId !== principal.userId)
-      throw new NotFoundException();
+    requireRequestAccess(request, principal);
   }
   private access(row: AssessmentContext, principal: AuthPrincipal) {
-    this.accessRequest(row.request, principal);
-    if (
-      row.assessment.employerId !== row.request.employerId ||
-      (principal.role === "ROLE_CONSULTANT" &&
-        row.assessment.assignedConsultantId !== principal.userId)
-    )
-      throw new NotFoundException();
+    requireAssessmentAccess(row, principal);
   }
   private async scope(assessmentId: string, scopeId: string) {
     await this.work.lockScope(scopeId);

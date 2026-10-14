@@ -53,12 +53,26 @@ const cursor = (kind: ConsultingCursorKind) =>
       return z.NEVER;
     })
     .optional();
+
+/** Shared security list pagination primitives (default 25, max 100; per-kind cursor). */
+export { cursor as securityListCursor, limit as securityListLimit };
 export const assessmentListQuerySchema = z
   .object({
     status: z.enum(assessmentStatus.enumValues).optional(),
     service: z.enum(securityServiceType.enumValues).optional(),
     employerId: z.uuid().optional(),
     cursor: cursor(CONSULTING_CURSOR_KINDS.assessments),
+    limit,
+  })
+  .strict();
+/**
+ * API-ASM-007 (Business). Employer identity always comes from the session;
+ * employerId/service and any unknown parameter are rejected (strict).
+ */
+export const businessAssessmentListQuerySchema = z
+  .object({
+    status: z.enum(assessmentStatus.enumValues).optional(),
+    cursor: cursor(CONSULTING_CURSOR_KINDS.businessAssessments),
     limit,
   })
   .strict();
@@ -75,3 +89,4 @@ export type FindingUpdateInput = z.infer<typeof findingUpdateInputSchema>;
 export type ResolutionInput = z.infer<typeof resolutionInputSchema>;
 export type AssessmentListQuery = z.infer<typeof assessmentListQuerySchema>;
 export type FindingListQuery = z.infer<typeof findingListQuerySchema>;
+export type BusinessAssessmentListQuery = z.infer<typeof businessAssessmentListQuerySchema>;

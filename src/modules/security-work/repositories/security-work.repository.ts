@@ -10,7 +10,24 @@ import {
   vulnerabilityFindings,
 } from "../../../infrastructure/database/schema";
 import type { DecodedConsultingCursor } from "../../consulting/pagination/consulting-pagination";
-import type { AssessmentListQuery, FindingListQuery } from "../dto/security-work.dto";
+import type {
+  AssessmentListQuery,
+  BusinessAssessmentListQuery,
+  FindingListQuery,
+} from "../dto/security-work.dto";
+
+/**
+ * AssessmentClientView columns (API Contract v1.3) — selected explicitly so a
+ * select-all assessment row can never reach a Business response.
+ */
+const clientAssessmentColumns = {
+  id: securityAssessments.id,
+  service: securityAssessments.service,
+  status: securityAssessments.status,
+  startedAt: securityAssessments.startedAt,
+  completedAt: securityAssessments.completedAt,
+  createdAt: securityAssessments.createdAt,
+};
 
 @Injectable()
 export class SecurityWorkRepository {
@@ -171,6 +188,44 @@ export class SecurityWorkRepository {
       .where(and(...filters))
       .orderBy(desc(securityAssessments.createdAt), desc(securityAssessments.id))
       .limit(query.limit + 1);
+  }
+  /** API-ASM-007: own-ORG assessments only; the employer predicate is reapplied on every page. */
+  async listClientAssessments(employerId: string, query: BusinessAssessmentListQuery) {
+    const filters: SQL[] = [
+      eq(securityAssessments.employerId, employerId),
+      eq(consultingRequests.employerId, employerId),
+    ];
+    if (query.status) filters.push(eq(securityAssessments.status, query.status));
+    this.addCursor(filters, securityAssessments, query.cursor);
+    return this.db
+      .select(clientAssessmentColumns)
+      .from(securityAssessments)
+      .innerJoin(
+        consultingRequests,
+        eq(securityAssessments.consultingRequestId, consultingRequests.id),
+      )
+      .where(and(...filters))
+      .orderBy(desc(securityAssessments.createdAt), desc(securityAssessments.id))
+      .limit(query.limit + 1);
+  }
+  /** API-ASM-008: null for missing, cross-ORG or request/assessment employer mismatch. */
+  async clientAssessment(id: string, employerId: string) {
+    const [row] = await this.db
+      .select(clientAssessmentColumns)
+      .from(securityAssessments)
+      .innerJoin(
+        consultingRequests,
+        eq(securityAssessments.consultingRequestId, consultingRequests.id),
+      )
+      .where(
+        and(
+          eq(securityAssessments.id, id),
+          eq(securityAssessments.employerId, employerId),
+          eq(consultingRequests.employerId, employerId),
+        ),
+      )
+      .limit(1);
+    return row ?? null;
   }
   async listFindings(assessmentId: string, employerId: string, query: FindingListQuery) {
     const filters: SQL[] = [

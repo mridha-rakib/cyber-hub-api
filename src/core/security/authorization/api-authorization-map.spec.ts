@@ -19,8 +19,8 @@ const VALID_CLASSIFICATIONS: readonly RouteClassification[] = [
 const CALLER_DOMAIN_PERMISSION_ALLOWLIST = ["API-FILE-001", "API-FILE-002"];
 
 describe("API_AUTHORIZATION_MAP", () => {
-  it("contains exactly 209 operations, per API Contract v1.1's frozen Master Endpoint Registry", () => {
-    expect(API_AUTHORIZATION_MAP.length).toBe(209);
+  it("contains exactly 210 operations, per API Contract v1.3's frozen Master Endpoint Registry (v1.1 209 + API-RPT-013)", () => {
+    expect(API_AUTHORIZATION_MAP.length).toBe(210);
   });
 
   it("has unique apiId values with no duplicates", () => {
@@ -87,18 +87,18 @@ describe("API_AUTHORIZATION_MAP", () => {
     }
   });
 
-  it("reports exact classification totals with zero AMBIGUOUS operations (14 public, 193 permission-protected, 2 authenticated-only)", () => {
+  it("reports exact classification totals with zero AMBIGUOUS operations (14 public, 194 permission-protected, 2 authenticated-only)", () => {
     const counts: Record<string, number> = {};
     for (const op of API_AUTHORIZATION_MAP) {
       counts[op.classification] = (counts[op.classification] ?? 0) + 1;
     }
     expect(counts.PUBLIC).toBe(14);
-    expect(counts.PERMISSION_PROTECTED).toBe(193);
+    expect(counts.PERMISSION_PROTECTED).toBe(194);
     expect(counts.AUTHENTICATED_ONLY).toBe(2);
     expect(counts.AMBIGUOUS).toBeUndefined();
     expect(
       (counts.PUBLIC ?? 0) + (counts.PERMISSION_PROTECTED ?? 0) + (counts.AUTHENTICATED_ONLY ?? 0),
-    ).toBe(209);
+    ).toBe(210);
   });
 
   it("marks the two current Wave 0C session endpoints as AUTHENTICATED_ONLY", () => {

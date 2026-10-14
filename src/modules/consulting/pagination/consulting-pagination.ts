@@ -5,6 +5,10 @@ export const CONSULTING_CURSOR_KINDS = {
   notes: "consulting-notes-created-at",
   assessments: "assessments-created-at",
   findings: "findings-created-at",
+  // Wave 6B: distinct kinds so a cursor issued by one list is never accepted
+  // by another.
+  businessAssessments: "business-assessments-created-at",
+  reports: "reports-created-at",
 } as const;
 
 export type ConsultingCursorKind =
