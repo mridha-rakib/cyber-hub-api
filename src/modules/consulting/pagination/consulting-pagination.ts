@@ -9,6 +9,11 @@ export const CONSULTING_CURSOR_KINDS = {
   // by another.
   businessAssessments: "business-assessments-created-at",
   reports: "reports-created-at",
+  // Wave 6C
+  businessFindings: "business-findings-created-at",
+  businessScores: "business-scores-calculated-at",
+  businessReports: "business-reports-created-at",
+  operationalScores: "operational-scores-calculated-at",
 } as const;
 
 export type ConsultingCursorKind =

@@ -23,6 +23,18 @@ export function assignedContext(
         : [],
   };
 }
+/** Collection context for ORG-scoped Business lists: never caller-supplied. */
+export function collectionContext(
+  resourceType: string,
+  actor: ResourceResolutionInput["actor"],
+): ResourceContext {
+  return {
+    resourceType,
+    resourceId: actor.userId,
+    employerId: actor.employerId,
+    assignedUserIds: [],
+  };
+}
 @Injectable()
 export class AssessmentResourceResolver implements ResourceContextResolver {
   readonly resourceType = "assessment";
@@ -61,16 +73,19 @@ export class AssessmentResourceResolver implements ResourceContextResolver {
 export class FindingResourceResolver implements ResourceContextResolver {
   readonly resourceType = "finding";
   constructor(private readonly work: SecurityWorkRepository) {}
-  async resolve({ routeParams }: ResourceResolutionInput): Promise<ResourceContext | null> {
+  async resolve({ actor, routeParams }: ResourceResolutionInput): Promise<ResourceContext | null> {
     if (routeParams.findingId) {
       const row = await this.work.finding(routeParams.findingId);
       return row && row.finding.employerId === row.assessment.employerId
         ? assignedContext(row, this.resourceType, row.finding.id)
         : null;
     }
-    const row = routeParams.assessmentId
-      ? await this.work.assessment(routeParams.assessmentId)
-      : null;
-    return row ? assignedContext(row, this.resourceType, row.assessment.id) : null;
+    if (routeParams.assessmentId) {
+      const row = await this.work.assessment(routeParams.assessmentId);
+      return row ? assignedContext(row, this.resourceType, row.assessment.id) : null;
+    }
+    // Business collection (API-SCR-004): authorize against the actor's own
+    // employer; the repository reapplies the employer and release predicates.
+    return collectionContext(this.resourceType, actor);
   }
 }

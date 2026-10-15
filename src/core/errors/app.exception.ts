@@ -210,3 +210,18 @@ export class FilePolicyNotConfiguredException extends AppException {
     });
   }
 }
+
+/**
+ * API Contract v1.3/v1.4 D6-1: score calculation (API-SCR-001) is rejected
+ * with no security_scores row while no approved GAP-009 methodology is
+ * configured.
+ */
+export class ScoreMethodologyNotConfiguredException extends AppException {
+  constructor() {
+    super({
+      code: ErrorCodes.SCORE_METHODOLOGY_NOT_CONFIGURED,
+      statusCode: HttpStatus.CONFLICT,
+      message: "No approved security score methodology is configured.",
+    });
+  }
+}

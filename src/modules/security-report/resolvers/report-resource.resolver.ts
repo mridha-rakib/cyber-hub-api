@@ -5,7 +5,10 @@ import type {
   ResourceResolutionInput,
 } from "../../../core/security/authorization/resource-context-resolver";
 import { SecurityWorkRepository } from "../../security-work/repositories/security-work.repository";
-import { assignedContext } from "../../security-work/resolvers/security-work-resource.resolver";
+import {
+  assignedContext,
+  collectionContext,
+} from "../../security-work/resolvers/security-work-resource.resolver";
 import { SecurityReportRepository } from "../repositories/security-report.repository";
 import { reportLinked } from "../services/security-report.service";
 
@@ -23,7 +26,7 @@ export class ReportResourceResolver implements ResourceContextResolver {
     private readonly reports: SecurityReportRepository,
     private readonly work: SecurityWorkRepository,
   ) {}
-  async resolve({ routeParams }: ResourceResolutionInput): Promise<ResourceContext | null> {
+  async resolve({ actor, routeParams }: ResourceResolutionInput): Promise<ResourceContext | null> {
     if (routeParams.reportId) {
       const row = await this.reports.report(routeParams.reportId);
       return row && reportLinked(row)
@@ -34,7 +37,9 @@ export class ReportResourceResolver implements ResourceContextResolver {
       const row = await this.work.assessment(routeParams.assessmentId);
       return row ? assignedContext(row, this.resourceType, row.assessment.id) : null;
     }
-    // No report operation is a collection without an assessment (no global /reports).
-    return null;
+    // Business released-report list (API-RPT-010) only: ORG context from the
+    // actor; the query reapplies employer and RELEASED/SUPERSEDED predicates.
+    // Operational report reads always carry an assessmentId (no global /reports).
+    return collectionContext(this.resourceType, actor);
   }
 }

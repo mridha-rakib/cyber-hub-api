@@ -10,7 +10,21 @@ import {
   securityReports,
   vulnerabilityFindings,
 } from "../../../infrastructure/database/schema";
-import type { ReportListQuery } from "../dto/security-report.dto";
+import { findingClientColumns } from "../../security-work/finding-client-view";
+import type { BusinessReportListQuery, ReportListQuery } from "../dto/security-report.dto";
+
+/** Business-visible report states (D-1, RBAC-DEC-013). */
+export const CLIENT_REPORT_STATUSES: SecurityReport["status"][] = ["RELEASED", "SUPERSEDED"];
+
+/** SecurityReportClientView columns (API Contract v1.3/v1.4, D6-4). */
+const clientReportColumns = {
+  id: securityReports.id,
+  assessmentId: securityReports.assessmentId,
+  status: securityReports.status,
+  versionNo: securityReports.versionNo,
+  releasedAt: securityReports.releasedAt,
+  createdAt: securityReports.createdAt,
+};
 
 /** SecurityReportOperationalSummaryView columns (API Contract v1.3, D6-9). */
 const summaryColumns = {
@@ -207,5 +221,72 @@ export class SecurityReportRepository {
       .where(and(...filters))
       .orderBy(desc(securityReports.createdAt), desc(securityReports.id))
       .limit(query.limit + 1);
+  }
+  /**
+   * Business ORG + release predicate (API-RPT-010/011/012): report, assessment
+   * and consulting request all belong to the actor's employer and the report
+   * is RELEASED or SUPERSEDED. Pre-release and cross-ORG rows never match.
+   */
+  private clientReportFilters(employerId: string): SQL[] {
+    return [
+      eq(securityReports.employerId, employerId),
+      eq(securityAssessments.employerId, employerId),
+      eq(consultingRequests.employerId, employerId),
+      inArray(securityReports.status, CLIENT_REPORT_STATUSES),
+    ];
+  }
+  private clientReportQuery(filters: SQL[]) {
+    return this.db
+      .select(clientReportColumns)
+      .from(securityReports)
+      .innerJoin(securityAssessments, eq(securityReports.assessmentId, securityAssessments.id))
+      .innerJoin(
+        consultingRequests,
+        eq(securityAssessments.consultingRequestId, consultingRequests.id),
+      )
+      .where(and(...filters));
+  }
+  /** API-RPT-010: own-ORG released/superseded reports, newest first. */
+  async listClientReports(employerId: string, query: BusinessReportListQuery) {
+    const filters = this.clientReportFilters(employerId);
+    if (query.cursor)
+      filters.push(
+        or(
+          lt(securityReports.createdAt, query.cursor.sortValue),
+          and(
+            eq(securityReports.createdAt, query.cursor.sortValue),
+            lt(securityReports.id, query.cursor.id),
+          ),
+        ) as SQL,
+      );
+    return this.clientReportQuery(filters)
+      .orderBy(desc(securityReports.createdAt), desc(securityReports.id))
+      .limit(query.limit + 1);
+  }
+  /** API-RPT-011/012: null for missing, cross-ORG, mislinked or pre-release reports. */
+  async clientReport(id: string, employerId: string) {
+    const [row] = await this.clientReportQuery([
+      eq(securityReports.id, id),
+      ...this.clientReportFilters(employerId),
+    ]).limit(1);
+    return row ?? null;
+  }
+  /** Included findings of a visible report, live values, ordered by sortOrder then id. */
+  async clientReportFindings(report: { id: string; assessmentId: string }, employerId: string) {
+    return this.db
+      .select(findingClientColumns)
+      .from(securityReportFindings)
+      .innerJoin(
+        vulnerabilityFindings,
+        eq(securityReportFindings.findingId, vulnerabilityFindings.id),
+      )
+      .where(
+        and(
+          eq(securityReportFindings.reportId, report.id),
+          eq(vulnerabilityFindings.employerId, employerId),
+          eq(vulnerabilityFindings.assessmentId, report.assessmentId),
+        ),
+      )
+      .orderBy(asc(securityReportFindings.sortOrder), asc(vulnerabilityFindings.id));
   }
 }

@@ -39,9 +39,18 @@ export const reportListQuerySchema = z
   })
   .strict();
 
+/** API-RPT-010 query: only cursor and limit; employer always comes from the session. */
+export const businessReportListQuerySchema = z
+  .object({
+    cursor: securityListCursor(CONSULTING_CURSOR_KINDS.businessReports),
+    limit: securityListLimit,
+  })
+  .strict();
+
 export type ReportCreateInput = z.infer<typeof reportCreateInputSchema>;
 export type ReportUpdateInput = z.infer<typeof reportUpdateInputSchema>;
 export type ReportFindingMembershipInput = z.infer<typeof reportFindingMembershipInputSchema>;
 export type ReportReleaseInput = z.infer<typeof reportReleaseInputSchema>;
 export type ReportSupersedeInput = z.infer<typeof reportSupersedeInputSchema>;
 export type ReportListQuery = z.infer<typeof reportListQuerySchema>;
+export type BusinessReportListQuery = z.infer<typeof businessReportListQuerySchema>;
