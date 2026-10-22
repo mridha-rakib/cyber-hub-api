@@ -32,6 +32,8 @@ import {
   ResourceContextResolverRegistry,
 } from "./authorization/resource-context-resolver";
 import { ScopeEvaluationService } from "./authorization/scope-evaluation.service";
+import { CsrfGuard } from "./csrf/csrf.guard";
+import { CsrfService } from "./csrf/csrf.service";
 import { AuthGuard } from "./guards/auth.guard";
 import { PermissionGuard } from "./guards/permission.guard";
 
@@ -48,8 +50,10 @@ import { PermissionGuard } from "./guards/permission.guard";
  *                         identifiers before resource resolution can query DB.
  *   3. PermissionGuard — deny-by-default RBAC enforcement consuming the
  *                         principal AuthGuard set. See permission.guard.ts.
+ *   4. CsrfGuard       — double-submit token + Origin check for unsafe
+ *                         methods on every route, public or authenticated.
  *
- * Declaring all three APP_GUARD entries in the same providers array (rather than
+ * Declaring all four APP_GUARD entries in the same providers array (rather than
  * splitting them across modules) is deliberate: NestJS preserves provider
  * declaration order within one array for multi-providers, which is the only
  * ordering guarantee this Wave depends on — PermissionGuard must never run
@@ -80,6 +84,14 @@ import { PermissionGuard } from "./guards/permission.guard";
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: UuidRouteParamGuard },
     { provide: APP_GUARD, useClass: PermissionGuard },
+    // API Contract v1.5 API-DEC-004 / §3.2 / API-AC-002: every unsafe method
+    // (POST, PUT, PATCH, DELETE) requires the double-submit CSRF token and an
+    // approved Origin when one is sent. Registered last so precedence stays
+    // 401 (AuthGuard) -> 422 malformed id -> 403 role/scope (PermissionGuard)
+    // -> 403 CSRF_INVALID. Safe methods pass straight through. No exemption
+    // exists; the only documented one (provider webhooks) is not implemented.
+    CsrfService,
+    { provide: APP_GUARD, useClass: CsrfGuard },
     // Factory provider: ConditionRegistry's constructor takes a plain
     // array, which Nest cannot resolve via implicit constructor-injection
     // reflection (arrays have no distinct runtime provider token). This

@@ -172,7 +172,13 @@ describe("Wave 0D-6 authorization/disclosure/workflow precedence (real Postgres)
     const sessionCookie = (setCookie.find((c) => c.startsWith("csh_session=")) as string).split(
       ";",
     )[0];
-    return { userId: registerResponse.body.data.accountId as string, sessionCookie };
+    // Global CsrfGuard (API-DEC-004): actors carry the double-submit pair.
+    const csrf3 = await getCsrf();
+    return {
+      userId: registerResponse.body.data.accountId as string,
+      sessionCookie: `${sessionCookie}; ${csrf3.cookieHeader}`,
+      csrfToken: csrf3.token,
+    };
   }
 
   async function registerAndLoginBusiness(label: string) {
@@ -293,6 +299,7 @@ describe("Wave 0D-6 authorization/disclosure/workflow precedence (real Postgres)
     await request(app.getHttpServer())
       .post(`/api/v1/test-workflow/assessment/${assessmentId}/cancel`)
       .set("Cookie", otherConsultant.sessionCookie)
+      .set("X-CSRF-Token", otherConsultant.csrfToken)
       .send({ expectedStateVersion: stateVersion })
       .expect(404);
   });
@@ -312,6 +319,7 @@ describe("Wave 0D-6 authorization/disclosure/workflow precedence (real Postgres)
     const response = await request(app.getHttpServer())
       .post(`/api/v1/test-workflow/assessment/${assessmentId}/cancel`)
       .set("Cookie", consultant.sessionCookie)
+      .set("X-CSRF-Token", consultant.csrfToken)
       .send({ expectedStateVersion: stateVersion })
       .expect(409);
     expect(response.body.error.code).toBe("STATE_CONFLICT");
@@ -332,6 +340,7 @@ describe("Wave 0D-6 authorization/disclosure/workflow precedence (real Postgres)
     const response = await request(app.getHttpServer())
       .post(`/api/v1/test-workflow/assessment/${assessmentId}/cancel`)
       .set("Cookie", consultant.sessionCookie)
+      .set("X-CSRF-Token", consultant.csrfToken)
       .send({ expectedStateVersion: stateVersion + 5 })
       .expect(409);
     expect(response.body.error.code).toBe("STATE_VERSION_CONFLICT");
@@ -353,6 +362,7 @@ describe("Wave 0D-6 authorization/disclosure/workflow precedence (real Postgres)
     const response = await request(app.getHttpServer())
       .post(`/api/v1/test-workflow/assessment/${assessmentId}/cancel`)
       .set("Cookie", consultant.sessionCookie)
+      .set("X-CSRF-Token", consultant.csrfToken)
       .send({ expectedStateVersion: stateVersion })
       .expect(201);
     expect(response.body.data.status).toBe("CANCELLED");
@@ -377,6 +387,7 @@ describe("Wave 0D-6 authorization/disclosure/workflow precedence (real Postgres)
       const response = await request(app.getHttpServer())
         .post(`/api/v1/test-workflow/assessment/${assessmentId}/cancel`)
         .set("Cookie", admin.sessionCookie)
+        .set("X-CSRF-Token", admin.csrfToken)
         .send({ expectedStateVersion: stateVersion })
         .expect(201);
       expect(response.body.data.status).toBe("CANCELLED");
@@ -399,6 +410,7 @@ describe("Wave 0D-6 authorization/disclosure/workflow precedence (real Postgres)
       const response = await request(app.getHttpServer())
         .post(`/api/v1/test-workflow/assessment/${assessmentId}/cancel`)
         .set("Cookie", admin.sessionCookie)
+        .set("X-CSRF-Token", admin.csrfToken)
         .send({ expectedStateVersion: stateVersion })
         .expect(409);
       expect(response.body.error.code).toBe("STATE_CONFLICT");
@@ -421,6 +433,7 @@ describe("Wave 0D-6 authorization/disclosure/workflow precedence (real Postgres)
       const response = await request(app.getHttpServer())
         .post(`/api/v1/test-workflow/assessment/${assessmentId}/cancel`)
         .set("Cookie", admin.sessionCookie)
+        .set("X-CSRF-Token", admin.csrfToken)
         .send({ expectedStateVersion: stateVersion + 100 })
         .expect(409);
       expect(response.body.error.code).toBe("STATE_VERSION_CONFLICT");
@@ -450,6 +463,7 @@ describe("Wave 0D-6 authorization/disclosure/workflow precedence (real Postgres)
       const response = await request(app.getHttpServer())
         .post(`/api/v1/test-workflow/assessment/${assessmentId}/cancel`)
         .set("Cookie", admin.sessionCookie)
+        .set("X-CSRF-Token", admin.csrfToken)
         .send({ expectedStateVersion: stateVersion })
         .expect(403);
       expect(response.body.error.code).toBe("SECURITY_SCOPE_NOT_AUTHORIZED");

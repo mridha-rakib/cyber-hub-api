@@ -16,6 +16,8 @@ import { RequestContextModule } from "./core/request-context/request-context.mod
 import { SecurityModule } from "./core/security/security.module";
 import { WorkflowModule } from "./core/workflow/workflow.module";
 import { EmailModule } from "./infrastructure/email/email.module";
+import { AdminAccountsModule } from "./modules/admin-accounts/admin-accounts.module";
+import { AuditModule } from "./modules/audit/audit.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CareerModule } from "./modules/career/career.module";
 import { CertificateModule } from "./modules/certificate/certificate.module";
@@ -37,6 +39,8 @@ import { PortfolioModule } from "./modules/portfolio/portfolio.module";
     CertificateModule,
     PortfolioModule,
     CareerModule,
+    AuditModule,
+    AdminAccountsModule,
     ThrottlerModule.forRoot([
       {
         name: "default",

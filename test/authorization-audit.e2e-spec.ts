@@ -198,7 +198,13 @@ describe("Wave 0D-7 authorization decision audit logging (real Postgres)", () =>
     const sessionCookie = (setCookie.find((c) => c.startsWith("csh_session=")) as string).split(
       ";",
     )[0];
-    return { userId: registerResponse.body.data.accountId as string, sessionCookie };
+    // Global CsrfGuard (API-DEC-004): actors carry the double-submit pair.
+    const csrf3 = await getCsrf(server);
+    return {
+      userId: registerResponse.body.data.accountId as string,
+      sessionCookie: `${sessionCookie}; ${csrf3.cookieHeader}`,
+      csrfToken: csrf3.token,
+    };
   }
 
   async function registerAndLoginBusiness(application: INestApplication, label: string) {
@@ -229,10 +235,12 @@ describe("Wave 0D-7 authorization decision audit logging (real Postgres)", () =>
     const [row] = await queryRows<{ employer_id: string }>(
       sql`select employer_id from users where id = ${registerResponse.body.data.accountId}`,
     );
+    const csrf3 = await getCsrf(server);
     return {
       userId: registerResponse.body.data.accountId as string,
       employerId: row.employer_id,
-      sessionCookie,
+      sessionCookie: `${sessionCookie}; ${csrf3.cookieHeader}`,
+      csrfToken: csrf3.token,
     };
   }
 
@@ -326,6 +334,7 @@ describe("Wave 0D-7 authorization decision audit logging (real Postgres)", () =>
       const response = await request(app.getHttpServer())
         .post(`/api/v1/test-audit/assessment/${assessmentId}/start`)
         .set("Cookie", consultant.sessionCookie)
+        .set("X-CSRF-Token", consultant.csrfToken)
         .send({ expectedStateVersion: stateVersion })
         .expect(201);
 
@@ -364,6 +373,7 @@ describe("Wave 0D-7 authorization decision audit logging (real Postgres)", () =>
       const response = await request(app.getHttpServer())
         .post(`/api/v1/test-audit/assessment/${assessmentId}/start`)
         .set("Cookie", consultant.sessionCookie)
+        .set("X-CSRF-Token", consultant.csrfToken)
         .send({ expectedStateVersion: stateVersion + 99 }) // stale
         .expect(409);
 
@@ -381,6 +391,7 @@ describe("Wave 0D-7 authorization decision audit logging (real Postgres)", () =>
       const response = await request(app.getHttpServer())
         .post(`/api/v1/test-audit/assessment/00000000-0000-0000-0000-000000000000/start`)
         .set("Cookie", business.sessionCookie)
+        .set("X-CSRF-Token", business.csrfToken)
         .send({ expectedStateVersion: 1 })
         .expect(403);
 
@@ -410,6 +421,7 @@ describe("Wave 0D-7 authorization decision audit logging (real Postgres)", () =>
       const response = await request(app.getHttpServer())
         .post(`/api/v1/test-audit/assessment/${assessmentId}/start`)
         .set("Cookie", other.sessionCookie)
+        .set("X-CSRF-Token", other.csrfToken)
         .send({ expectedStateVersion: stateVersion })
         .expect(404);
 
@@ -431,6 +443,7 @@ describe("Wave 0D-7 authorization decision audit logging (real Postgres)", () =>
       const response = await request(app.getHttpServer())
         .post("/api/v1/test-audit/assessment/00000000-0000-0000-0000-000000000000/start")
         .set("Cookie", consultant.sessionCookie)
+        .set("X-CSRF-Token", consultant.csrfToken)
         .send({ expectedStateVersion: 1 })
         .expect(404);
 
@@ -457,6 +470,7 @@ describe("Wave 0D-7 authorization decision audit logging (real Postgres)", () =>
       const response = await request(app.getHttpServer())
         .post(`/api/v1/test-audit/assessment-read/${assessmentId}`)
         .set("Cookie", business.sessionCookie)
+        .set("X-CSRF-Token", business.csrfToken)
         .send({})
         .expect(201);
 
@@ -483,6 +497,7 @@ describe("Wave 0D-7 authorization decision audit logging (real Postgres)", () =>
       const response = await request(app.getHttpServer())
         .post(`/api/v1/test-audit/assessment/${assessmentId}/start`)
         .set("Cookie", admin.sessionCookie)
+        .set("X-CSRF-Token", admin.csrfToken)
         .send({ expectedStateVersion: stateVersion })
         .expect(201);
 
@@ -512,6 +527,7 @@ describe("Wave 0D-7 authorization decision audit logging (real Postgres)", () =>
       const response = await request(app.getHttpServer())
         .post(`/api/v1/test-audit/assessment/${assessmentId}/start`)
         .set("Cookie", admin.sessionCookie)
+        .set("X-CSRF-Token", admin.csrfToken)
         .send({ expectedStateVersion: stateVersion })
         .expect(404);
 
@@ -538,7 +554,13 @@ describe("Wave 0D-7 authorization decision audit logging (real Postgres)", () =>
       const sentinel = "DO_NOT_LOG_SECRET_9f8e7d6c5b4a";
       const response = await request(app.getHttpServer())
         .post(`/api/v1/test-audit/assessment/${assessmentId}/start?token=${sentinel}`)
-        .set("Cookie", `${consultant.sessionCookie}; extra=${sentinel}`)
+        // The sentinel is also the double-submit CSRF pair (cookie + header),
+        // so the request passes the global CsrfGuard while the CSRF header
+        // value is still one of the secrets that must never be audited.
+        .set(
+          "Cookie",
+          `${consultant.sessionCookie.split("; ")[0]}; csh_csrf=${sentinel}; extra=${sentinel}`,
+        )
         .set("Authorization", `Bearer ${sentinel}`)
         .set("X-CSRF-Token", sentinel)
         .send({ expectedStateVersion: stateVersion, password: sentinel, secret: sentinel })
@@ -583,6 +605,7 @@ describe("Wave 0D-7 authorization decision audit logging (real Postgres)", () =>
       const response = await request(app.getHttpServer())
         .post(`/api/v1/test-audit/assessment/${assessmentId}/start`)
         .set("Cookie", consultant.sessionCookie)
+        .set("X-CSRF-Token", consultant.csrfToken)
         .send({ expectedStateVersion: stateVersion })
         .expect(201);
 
@@ -626,6 +649,7 @@ describe("Wave 0D-7 authorization decision audit logging (real Postgres)", () =>
       await request(failingApp.getHttpServer())
         .post(`/api/v1/test-audit/assessment/${assessmentId}/start`)
         .set("Cookie", consultant.sessionCookie)
+        .set("X-CSRF-Token", consultant.csrfToken)
         .send({ expectedStateVersion: stateVersion })
         .expect(500);
 
@@ -653,6 +677,7 @@ describe("Wave 0D-7 authorization decision audit logging (real Postgres)", () =>
       const response = await request(failingApp.getHttpServer())
         .post(`/api/v1/test-audit/assessment/${assessmentId}/start`)
         .set("Cookie", other.sessionCookie)
+        .set("X-CSRF-Token", other.csrfToken)
         .send({ expectedStateVersion: stateVersion })
         .expect(404);
       expect(response.body.error.message).toBe("Resource not found");
@@ -663,6 +688,7 @@ describe("Wave 0D-7 authorization decision audit logging (real Postgres)", () =>
       await request(failingApp.getHttpServer())
         .post("/api/v1/test-audit/assessment/00000000-0000-0000-0000-000000000000/start")
         .set("Cookie", business.sessionCookie)
+        .set("X-CSRF-Token", business.csrfToken)
         .send({ expectedStateVersion: 1 })
         .expect(403);
     });
@@ -681,6 +707,7 @@ describe("Wave 0D-7 authorization decision audit logging (real Postgres)", () =>
       await request(failingApp.getHttpServer())
         .post(`/api/v1/test-audit/assessment-read/${assessmentId}`)
         .set("Cookie", business.sessionCookie)
+        .set("X-CSRF-Token", business.csrfToken)
         .send({})
         .expect(201);
     });
