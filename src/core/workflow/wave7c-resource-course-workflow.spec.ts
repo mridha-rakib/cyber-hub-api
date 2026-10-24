@@ -26,12 +26,20 @@ describe("Wave 7C Resource/Course workflow security foundation (N-01)", () => {
   ] as const;
 
   describe("authorization metadata", () => {
-    it("flags exactly the eight Resource/Course mutations workflowValidationRequired (create/list/read stay unflagged)", () => {
+    it("flags the eight Resource/Course mutations plus Resource create (G4A-02); Course create and all reads stay unflagged", () => {
       const flagged = API_AUTHORIZATION_MAP.filter(
         (o) => /^API-ADM(RES|CRS)-/.test(o.apiId) && o.workflowValidationRequired,
       ).map((o) => o.apiId);
-      expect(flagged.sort()).toEqual([...MUTATIONS].sort());
-      for (const id of ["API-ADMRES-001", "API-ADMRES-006", "API-ADMRES-007"]) {
+      expect(flagged.sort()).toEqual([...MUTATIONS, "API-ADMRES-001"].sort());
+      expect(op("API-ADMRES-001")).toMatchObject({
+        method: "POST",
+        path: "/admin/resources",
+        permissionKey: "resource.manage",
+        roles: ["ROLE_ADMIN"],
+        scope: [],
+        workflowValidationRequired: true,
+      });
+      for (const id of ["API-ADMRES-006", "API-ADMRES-007"]) {
         expect(op(id)?.workflowValidationRequired).toBe(false);
       }
       for (const id of ["API-ADMCRS-001", "API-ADMCRS-006", "API-ADMCRS-007"]) {
@@ -79,8 +87,9 @@ describe("Wave 7C Resource/Course workflow security foundation (N-01)", () => {
     it("keeps the 210-operation registry intact with unique ids, and the 60 pre-Wave-7C workflow operations unchanged", () => {
       expect(API_AUTHORIZATION_MAP.length).toBe(210);
       expect(new Set(API_AUTHORIZATION_MAP.map((o) => o.apiId)).size).toBe(210);
+      const wave7c = [...MUTATIONS, "API-ADMRES-001"] as readonly string[];
       const others = API_AUTHORIZATION_MAP.filter(
-        (o) => o.workflowValidationRequired && !(MUTATIONS as readonly string[]).includes(o.apiId),
+        (o) => o.workflowValidationRequired && !wave7c.includes(o.apiId),
       );
       expect(others.length).toBe(60);
       for (const o of others) expect(WORKFLOW_OPERATION_MAP[o.apiId]).toBeDefined();
@@ -256,7 +265,8 @@ describe("Wave 7C Resource/Course workflow security foundation (N-01)", () => {
 
   describe("default deny / safe failure", () => {
     it("has no mapping for unflagged or unknown operations", () => {
-      expect(getWorkflowOperationMapping("API-ADMRES-001")).toBeUndefined();
+      expect(getWorkflowOperationMapping("API-ADMCRS-001")).toBeUndefined();
+      expect(getWorkflowOperationMapping("API-ADMRES-006")).toBeUndefined();
       expect(getWorkflowOperationMapping("API-ADMCRS-007")).toBeUndefined();
       expect(getWorkflowOperationMapping("API-DOES-NOT-EXIST" as ApiId)).toBeUndefined();
     });

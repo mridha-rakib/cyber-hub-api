@@ -7,7 +7,7 @@ import type { WorkflowEntityType, WorkflowState, WorkflowTransitionId } from "./
  * No controller/service should hardcode a transition id inline.
  *
  * Three mapping kinds, all doc-grounded; one is required for every one of
- * the 68 `workflowValidationRequired` operations (see
+ * the 69 `workflowValidationRequired` operations (see
  * `workflow-operation-map.spec.ts` for the structural proof that coverage
  * is complete and that no non-workflow operation is accidentally mapped):
  *
@@ -325,7 +325,10 @@ export const WORKFLOW_OPERATION_MAP: Readonly<Partial<Record<ApiId, WorkflowOper
 
   // Learning resource (State & Workflow v1.3 §5A.1; API Contract v1.6 W7C-1/W7C-2).
   // Edit in any state without a state change; publish covers first publication
-  // (WF-RES-02) and republication (WF-RES-04); delete is DRAFT-only.
+  // (WF-RES-02) and republication (WF-RES-04); delete is DRAFT-only. Creation is
+  // the documented WF-RES-01 (new -> DRAFT), like every other entity whose
+  // registry defines a create transition (G4A-02).
+  "API-ADMRES-001": { kind: "TRANSITION", entityType: "Resource", transitionIds: ["WF-RES-01"] },
   "API-ADMRES-002": {
     kind: "EDIT_GUARD",
     entityType: "Resource",

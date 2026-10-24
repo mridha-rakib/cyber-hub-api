@@ -545,7 +545,7 @@ export const API_AUTHORIZATION_MAP: readonly ApiOperationAuthorization[] = [
     resourceContextRequired: false,
     assignmentRequired: false,
     authScopeRequired: false,
-    workflowValidationRequired: false,
+    workflowValidationRequired: true,
     auditRequired: true,
     nonDisclosure: null,
     verificationMode: null,

@@ -14,6 +14,8 @@ import { InternshipResourceResolver } from "../../modules/internship/resolvers/i
 import { SubmissionResourceResolver } from "../../modules/internship/resolvers/submission-resource.resolver";
 import { PortfolioModule } from "../../modules/portfolio/portfolio.module";
 import { PortfolioResourceResolver } from "../../modules/portfolio/resolvers/portfolio-resource.resolver";
+import { ResourceContextResolverImpl } from "../../modules/resources/resolvers/resource-context.resolver";
+import { ResourcesModule } from "../../modules/resources/resources.module";
 import { ReportResourceResolver } from "../../modules/security-report/resolvers/report-resource.resolver";
 import { SecurityReportModule } from "../../modules/security-report/security-report.module";
 import { SecurityScoreResourceResolver } from "../../modules/security-score/resolvers/security-score-resource.resolver";
@@ -79,6 +81,7 @@ import { PermissionGuard } from "./guards/permission.guard";
     SecurityWorkModule,
     SecurityReportModule,
     SecurityScoreModule,
+    ResourcesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: AuthGuard },
@@ -122,6 +125,7 @@ import { PermissionGuard } from "./guards/permission.guard";
         finding: FindingResourceResolver,
         report: ReportResourceResolver,
         securityScore: SecurityScoreResourceResolver,
+        resource: ResourceContextResolverImpl,
       ) => [
         internship,
         submission,
@@ -135,6 +139,7 @@ import { PermissionGuard } from "./guards/permission.guard";
         finding,
         report,
         securityScore,
+        resource,
       ],
       inject: [
         InternshipResourceResolver,
@@ -149,6 +154,7 @@ import { PermissionGuard } from "./guards/permission.guard";
         FindingResourceResolver,
         ReportResourceResolver,
         SecurityScoreResourceResolver,
+        ResourceContextResolverImpl,
       ],
     },
     ResourceContextResolverRegistry,

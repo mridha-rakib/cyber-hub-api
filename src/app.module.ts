@@ -23,6 +23,7 @@ import { CareerModule } from "./modules/career/career.module";
 import { CertificateModule } from "./modules/certificate/certificate.module";
 import { InternshipModule } from "./modules/internship/internship.module";
 import { PortfolioModule } from "./modules/portfolio/portfolio.module";
+import { ResourcesModule } from "./modules/resources/resources.module";
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { PortfolioModule } from "./modules/portfolio/portfolio.module";
     CareerModule,
     AuditModule,
     AdminAccountsModule,
+    ResourcesModule,
     ThrottlerModule.forRoot([
       {
         name: "default",
