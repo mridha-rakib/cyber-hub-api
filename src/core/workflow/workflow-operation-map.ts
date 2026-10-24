@@ -6,8 +6,8 @@ import type { WorkflowEntityType, WorkflowState, WorkflowTransitionId } from "./
  * — the single place transition ids are wired to concrete HTTP operations.
  * No controller/service should hardcode a transition id inline.
  *
- * Two mapping kinds, both doc-grounded and both required for every one of
- * the 60 `workflowValidationRequired` operations (see
+ * Three mapping kinds, all doc-grounded; one is required for every one of
+ * the 68 `workflowValidationRequired` operations (see
  * `workflow-operation-map.spec.ts` for the structural proof that coverage
  * is complete and that no non-workflow operation is accidentally mapped):
  *
@@ -26,6 +26,11 @@ import type { WorkflowEntityType, WorkflowState, WorkflowTransitionId } from "./
  *   No transition id/target state applies; `allowedStates` is the full
  *   doc-grounded set of states the mutation may occur in. stateVersion
  *   optimistic concurrency still applies to the underlying row.
+ * - DELETE_GUARD (Wave 7C): the operation REMOVES the row, allowed only while
+ *   it is in `allowedStates` and only at the expected stateVersion (State &
+ *   Workflow v1.3 §5A.3; API Contract v1.6 W7C-12). Deletion is not a
+ *   lifecycle transition: no transition id, no target state and no
+ *   stateVersion increment (the row is gone).
  */
 export type WorkflowOperationMapping =
   | {
@@ -35,6 +40,11 @@ export type WorkflowOperationMapping =
     }
   | {
       readonly kind: "EDIT_GUARD";
+      readonly entityType: WorkflowEntityType;
+      readonly allowedStates: readonly WorkflowState[];
+    }
+  | {
+      readonly kind: "DELETE_GUARD";
       readonly entityType: WorkflowEntityType;
       readonly allowedStates: readonly WorkflowState[];
     };
@@ -312,6 +322,46 @@ export const WORKFLOW_OPERATION_MAP: Readonly<Partial<Record<ApiId, WorkflowOper
   // Evidence submission (§3.4) — create/resubmit.
   "API-SUB-001": { kind: "TRANSITION", entityType: "Submission", transitionIds: ["WF-SUB-01"] },
   "API-SUB-003": { kind: "TRANSITION", entityType: "Submission", transitionIds: ["WF-SUB-05"] },
+
+  // Learning resource (State & Workflow v1.3 §5A.1; API Contract v1.6 W7C-1/W7C-2).
+  // Edit in any state without a state change; publish covers first publication
+  // (WF-RES-02) and republication (WF-RES-04); delete is DRAFT-only.
+  "API-ADMRES-002": {
+    kind: "EDIT_GUARD",
+    entityType: "Resource",
+    allowedStates: ["DRAFT", "PUBLISHED", "ARCHIVED"],
+  },
+  "API-ADMRES-003": {
+    kind: "TRANSITION",
+    entityType: "Resource",
+    transitionIds: ["WF-RES-02", "WF-RES-04"],
+  },
+  "API-ADMRES-004": { kind: "TRANSITION", entityType: "Resource", transitionIds: ["WF-RES-03"] },
+  "API-ADMRES-005": { kind: "DELETE_GUARD", entityType: "Resource", allowedStates: ["DRAFT"] },
+
+  // Course deal (§5A.2; W7C-3). Edits only in DRAFT/REJECTED (state preserved);
+  // approve from DRAFT (WF-CRS-02) or REJECTED (WF-CRS-03); reject from DRAFT
+  // (WF-CRS-04) or withdraw from APPROVED (WF-CRS-05); delete when not APPROVED.
+  "API-ADMCRS-002": {
+    kind: "EDIT_GUARD",
+    entityType: "Course",
+    allowedStates: ["DRAFT", "REJECTED"],
+  },
+  "API-ADMCRS-003": {
+    kind: "TRANSITION",
+    entityType: "Course",
+    transitionIds: ["WF-CRS-02", "WF-CRS-03"],
+  },
+  "API-ADMCRS-004": {
+    kind: "TRANSITION",
+    entityType: "Course",
+    transitionIds: ["WF-CRS-04", "WF-CRS-05"],
+  },
+  "API-ADMCRS-005": {
+    kind: "DELETE_GUARD",
+    entityType: "Course",
+    allowedStates: ["DRAFT", "REJECTED"],
+  },
 };
 
 export function getWorkflowOperationMapping(apiId: ApiId): WorkflowOperationMapping | undefined {

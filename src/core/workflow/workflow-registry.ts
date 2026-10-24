@@ -409,6 +409,76 @@ const WORKFLOW_DEFINITIONS: readonly WorkflowDefinition[] = [
       },
     ],
   },
+  {
+    // Wave 7C (§5A.1). No terminal state: ARCHIVED -> PUBLISHED is documented
+    // (WF-RES-04) and there is deliberately no transition back to DRAFT.
+    // Edits (any state) and DRAFT-only deletion are NOT transitions — they are
+    // EDIT_GUARD / DELETE_GUARD policies in workflow-operation-map.ts.
+    entityType: "Resource",
+    states: ["DRAFT", "PUBLISHED", "ARCHIVED"],
+    terminalStates: [],
+    transitions: [
+      { id: "WF-RES-01", from: [], to: "DRAFT", source: "State & Workflow Spec v1.3 §5A.1" },
+      {
+        id: "WF-RES-02",
+        from: ["DRAFT"],
+        to: "PUBLISHED",
+        source: "State & Workflow Spec v1.3 §5A.1 — sets published_at to server time",
+      },
+      {
+        id: "WF-RES-03",
+        from: ["PUBLISHED"],
+        to: "ARCHIVED",
+        source: "State & Workflow Spec v1.3 §5A.1 — published_at retained",
+      },
+      {
+        id: "WF-RES-04",
+        from: ["ARCHIVED"],
+        to: "PUBLISHED",
+        source: "State & Workflow Spec v1.3 §5A.1 — published_at reset to server time",
+      },
+    ],
+  },
+  {
+    // Wave 7C (§5A.2). No terminal state (REJECTED -> APPROVED and APPROVED ->
+    // REJECTED are both documented) and no WITHDRAWN state: withdrawal is
+    // WF-CRS-05. Approval guards (affiliate declaration, disclosure, not
+    // expired, verified discount) and reason requirements are enforced by the
+    // calling service, not the pure state machine. Edits (DRAFT/REJECTED) and
+    // non-APPROVED deletion are EDIT_GUARD / DELETE_GUARD policies.
+    entityType: "Course",
+    states: ["DRAFT", "APPROVED", "REJECTED"],
+    terminalStates: [],
+    transitions: [
+      { id: "WF-CRS-01", from: [], to: "DRAFT", source: "State & Workflow Spec v1.3 §5A.2" },
+      {
+        id: "WF-CRS-02",
+        from: ["DRAFT"],
+        to: "APPROVED",
+        source:
+          "State & Workflow Spec v1.3 §5A.2 — affiliate declared, disclosure when affiliated, not expired (service-enforced guards); stores verification note, clears rejection reason",
+      },
+      {
+        id: "WF-CRS-03",
+        from: ["REJECTED"],
+        to: "APPROVED",
+        source: "State & Workflow Spec v1.3 §5A.2 — same guards and effects as WF-CRS-02",
+      },
+      {
+        id: "WF-CRS-04",
+        from: ["DRAFT"],
+        to: "REJECTED",
+        source: "State & Workflow Spec v1.3 §5A.2 — rejection reason required (service-enforced)",
+      },
+      {
+        id: "WF-CRS-05",
+        from: ["APPROVED"],
+        to: "REJECTED",
+        source:
+          "State & Workflow Spec v1.3 §5A.2 — withdrawal; reason required (service-enforced); verification note unchanged",
+      },
+    ],
+  },
 ];
 
 export const WORKFLOW_REGISTRY: ReadonlyMap<WorkflowEntityType, WorkflowDefinition> = new Map(

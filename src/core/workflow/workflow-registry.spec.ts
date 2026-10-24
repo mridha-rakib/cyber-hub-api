@@ -15,6 +15,8 @@ describe("workflow-registry — Wave 0D-6 structural coverage", () => {
         "Finding",
         "Report",
         "MonitoringSubscription",
+        "Resource",
+        "Course",
       ].sort(),
     );
   });
@@ -83,12 +85,14 @@ describe("workflow-registry — Wave 0D-6 structural coverage", () => {
       Finding: { states: 3, transitions: 5 },
       Report: { states: 5, transitions: 7 },
       MonitoringSubscription: { states: 4, transitions: 7 },
+      Resource: { states: 3, transitions: 4 },
+      Course: { states: 3, transitions: 5 },
     });
   });
 
-  it("total named transitions across the entire registry is exactly 57 (11 entities — CareerListing and EmployerOpportunity are distinct persisted records sharing the same §5 moderation graph, so its 6 transitions are counted once per entity)", () => {
+  it("total named transitions across the entire registry is exactly 66 (13 entities — CareerListing and EmployerOpportunity are distinct persisted records sharing the same §5 moderation graph, so its 6 transitions are counted once per entity; Wave 7C adds Resource 4 + Course 5)", () => {
     let total = 0;
     for (const def of WORKFLOW_REGISTRY.values()) total += def.transitions.length;
-    expect(total).toBe(57);
+    expect(total).toBe(66);
   });
 });

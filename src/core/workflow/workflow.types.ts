@@ -24,7 +24,10 @@ export type WorkflowEntityType =
   | "SecurityAssessment"
   | "Finding"
   | "Report"
-  | "MonitoringSubscription";
+  | "MonitoringSubscription"
+  // State & Workflow v1.3 §5A (Wave 7C): learning resources and course deals.
+  | "Resource"
+  | "Course";
 
 /** A persisted lifecycle value for one entity type. Never client-settable. */
 export type WorkflowState = string;

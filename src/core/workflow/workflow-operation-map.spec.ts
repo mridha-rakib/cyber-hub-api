@@ -6,7 +6,8 @@ describe("workflow-operation-map — Wave 0D-6 Phase 7 coverage validation", () 
   const workflowSensitiveOps = API_AUTHORIZATION_MAP.filter((op) => op.workflowValidationRequired);
 
   it("recomputes the exact workflow-sensitive API operation count from the current source (not assumed)", () => {
-    expect(workflowSensitiveOps.length).toBe(60);
+    // 60 pre-Wave-7C + 8 Resource/Course mutations (ADMRES/ADMCRS-002..005, N-01).
+    expect(workflowSensitiveOps.length).toBe(68);
   });
 
   it("every workflowValidationRequired operation resolves to exactly one mapping entry — unresolved count is zero", () => {
@@ -52,7 +53,19 @@ describe("workflow-operation-map — Wave 0D-6 Phase 7 coverage validation", () 
   });
 
   it("no duplicate contradictory mapping — every apiId key appears exactly once (object keys are inherently unique; this proves no accidental overwrite by re-checking the source count matches entries)", () => {
-    expect(Object.keys(WORKFLOW_OPERATION_MAP).length).toBe(60);
+    expect(Object.keys(WORKFLOW_OPERATION_MAP).length).toBe(68);
+  });
+
+  it("every DELETE_GUARD mapping references a real entity type and every allowedState is a real state of that entity", () => {
+    for (const [apiId, mapping] of Object.entries(WORKFLOW_OPERATION_MAP)) {
+      if (mapping?.kind !== "DELETE_GUARD") continue;
+      const def = WORKFLOW_REGISTRY.get(mapping.entityType);
+      expect(def).toBeDefined();
+      expect(mapping.allowedStates.length).toBeGreaterThan(0);
+      for (const state of mapping.allowedStates) {
+        expect({ apiId, state, valid: def?.states.includes(state) }).toMatchObject({ valid: true });
+      }
+    }
   });
 
   it("multi-candidate TRANSITION mappings (more than one transitionId) all target the same `to` state, so a single atomic CAS update is well-defined", () => {
