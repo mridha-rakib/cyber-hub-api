@@ -181,3 +181,23 @@ export const employerOpportunityType = pgEnum("employer_opportunity_type", [
   "INTERNSHIP_OPPORTUNITY",
   "STUDENT_PROJECT",
 ]);
+
+/**
+ * ERD v2.3 §6 Enum Catalogue: "content_status | DRAFT, PUBLISHED, ARCHIVED |
+ * Resource publishing" — used by §7.5 `resources.status`. Values only — the
+ * WF-RES-01..04 lifecycle (State & Workflow v1.3 §5A.1) is enforced by the
+ * application service, not here.
+ */
+export const contentStatus = pgEnum("content_status", ["DRAFT", "PUBLISHED", "ARCHIVED"]);
+
+/**
+ * ERD v2.3 §6 Enum Catalogue: "course_approval_status | DRAFT, APPROVED,
+ * REJECTED | Course moderation" — used by §7.8 `courses.approval_status`.
+ * There is deliberately no WITHDRAWN value: withdrawal is APPROVED -> REJECTED
+ * (WF-CRS-05, State & Workflow v1.3 §5A.2).
+ */
+export const courseApprovalStatus = pgEnum("course_approval_status", [
+  "DRAFT",
+  "APPROVED",
+  "REJECTED",
+]);

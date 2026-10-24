@@ -57,6 +57,13 @@
       "when": 1791959946378,
       "tag": "0007_wave6a_score_report_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792817222063,
+      "tag": "0008_wave7c_resources_courses",
+      "breakpoints": true
     }
   ]
 }
